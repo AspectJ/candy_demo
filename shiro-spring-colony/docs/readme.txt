@@ -1,0 +1,1 @@
+在shiro与spring整合的基础上，实现了分布的功能(session和权限缓存存储到了redis中)

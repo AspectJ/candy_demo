@@ -1,0 +1,6 @@
+<component name="ArtifactManager">
+  <artifact type="exploded-war" name="shiro-spring-conoly">
+    <output-path>$PROJECT_DIR$/classes/artifacts/shiro_spring_conoly</output-path>
+    <root id="root" />
+  </artifact>
+</component>
