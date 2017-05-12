@@ -1,0 +1,1 @@
+cinemacloud 是实现了shiro权限的项目，同时实现了分布式(将session 和缓存权限存储到redis)
