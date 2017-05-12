@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>潇湘院线影院服务管理系统</title>
+  <link href="/favicon.ico" rel="shortcut icon" type="image/x-icon">
+  <!-- Polyfills -->
+  <!--[if lt IE 10]>
+  <script src="https://as.alipayobjects.com/g/component/??console-polyfill/0.2.2/index.js,es5-shim/4.5.7/es5-shim.min.js,es5-shim/4.5.7/es5-sham.min.js,html5shiv/3.7.2/html5shiv.min.js,media-match/2.0.2/media.match.min.js"></script>
+  <![endif]-->
+
+  <script>
+    var ms_ie = false;
+    var ua = window.navigator.userAgent;
+    var old_ie = ua.indexOf('MSIE ');
+    var new_ie = ua.indexOf('Trident/');
+
+    if ((old_ie > -1) || (new_ie > -1)) {
+      ms_ie = true;
+
+      if (!String.prototype.startsWith) {
+        String.prototype.startsWith = function(searchString, position){
+          position = position || 0;
+          return this.substr(position, searchString.length) === searchString;
+        };
+      }
+    }
+  </script>
+   <link rel="stylesheet" href="/cinemacloud/cloud/third/mathquill/mathquill.css"/>
+  <link rel="stylesheet" href="/cinemacloud/cloud/index.css" />
+</head>
+<body>
+
+<div id="root"></div>
+
+<!-- jquery & mathquill javascript -->
+<script src="/cinemacloud/cloud/third/jquery.min.js"></script>
+<script src="/cinemacloud/cloud/third/mathquill/mathquill.min.js"></script>
+
+<script src="/cinemacloud/cloud/common.js"></script>
+<script src="/cinemacloud/cloud/index.js"></script>
+
+</body>
+</html>

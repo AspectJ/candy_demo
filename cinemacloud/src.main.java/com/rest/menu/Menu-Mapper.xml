@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="menu">
+
+	<!-- 根据角色ID删除该角色所有权限 -->
+	<delete id="deleteMenuByRoleid" parameterType="java.lang.String">
+		DELETE FROM rel_role_permission
+		WHERE roleid = #{roleid}
+	</delete>
+	
+	<!-- 权限及其子权限映射 -->
+	<resultMap type="com.cp.bean.Menu" id="menuAndSubMenuResultType">
+		<id column="menuid" property="menuid"/>
+		<result column="menuname" property="menuname"/>
+		<result column="parentid" property="parentid"/>
+		<result column="permission" property="permission"/>
+		<!-- 子权限集合 -->
+		<collection property="subMenuList" ofType="com.cp.bean.Menu">
+			<id column="submenuid" property="menuid"/>
+			<result column="submenuname" property="menuname"/>
+			<result column="subparentid" property="parentid"/>
+			<result column="subpermission" property="permission"/>
+		</collection>	
+	</resultMap>
+	
+	<!-- 查询出系统所有权限 -->
+	<select id="findAllMenu" resultMap="menuAndSubMenuResultType">
+		SELECT e.menuid, e.menuname, e.parentid, e.permission, m.menuid AS submenuid, m.menuname AS submenuname,
+			m.parentid AS subparentid, m.permission AS subpermission FROM t_menu m
+		JOIN t_menu e ON m.parentid = e.menuid
+		WHERE e.menuid != 0
+	</select>
+	
+	<!-- 查询当前用户所属角色的权限列表 -->
+	<select id="findAvailableMenuList" parameterType="java.lang.String" resultMap="menuAndSubMenuResultType">
+		SELECT u.menuid, u.menuname, u.parentid, u.permission, m.menuid AS submenuid, m.menuname AS submenuname,
+			m.parentid AS subparentid, m.permission AS subpermission FROM rel_role_permission rrp
+		JOIN t_menu m ON rrp.menuid = m.menuid
+		JOIN t_menu u ON m.parentid = u.menuid
+		WHERE roleid = #{roleid}
+	</select>
+	
+
+	<!-- 角色权限映射表与权限表一对一映射 -->
+	<resultMap type="com.cp.bean.Role_Menu" id="roleAndMenuResultMap">
+		<id column="pid" property="pid"/>
+		<result column="menuid" property="menuid"/>
+		<!-- 角色权限表(rel_role_permission)和权限表(t_menu) 一对一映射 -->
+		<association property="menu" javaType="com.cp.bean.Menu">
+			<id column="menuid" property="menuid"/>
+			<result column="menuname" property="menuname"/>
+			<result column="parentid" property="parentid"/>
+			<result column="permission" property="permission"/>
+		</association>
+	</resultMap>
+	
+	<!-- 根据角色id查询权限列表 -->
+	<select id="findMenuListByRoleid" parameterType="java.lang.Integer" resultMap="roleAndMenuResultMap">
+		SELECT rrp.pid, rrp.menuid, tm.menuname, tm.parentid, tm.permission
+		FROM rel_role_permission rrp
+		LEFT OUTER JOIN t_menu tm ON tm.menuid = rrp.menuid
+		WHERE rrp.roleid = #{roleid}
+	</select>
+</mapper>

@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="information">
+
+	<!-- 添加information -->
+	<insert id="addInformation">
+		<selectKey keyProperty="info_id" order="AFTER" resultType="java.lang.Integer">
+			SELECT LAST_INSERT_ID()
+		</selectKey>	
+		<choose>
+			<when test="start_time != null and end_time != null">
+				INSERT INTO t_information(
+						program_id, title, content, use_status, doc_name, audit_flag, image_name, start_time, 
+						end_time, createtime, author, operatorid)
+				VALUES (
+						#{program_id}, #{title}, #{content}, #{use_status}, #{doc_name}, 0, #{image_name}, #{start_time},
+						#{end_time}, NOW(), #{author}, #{operatorid}
+				)
+			</when>
+			<otherwise>
+				INSERT INTO t_information(
+						program_id, title, content, use_status, doc_name, audit_flag, image_name, 
+					    createtime, author, operatorid)
+				VALUES (
+						#{program_id}, #{title}, #{content}, #{use_status}, #{doc_name}, 0, #{image_name},
+						NOW(), #{author}, #{operatorid}
+				)
+			</otherwise>
+		</choose>
+	</insert>
+	
+	
+	<!-- 为information添加archive -->
+	<insert id="addArchive" parameterType="java.util.Map">
+		INSERT INTO rel_info_archive(info_id, archiveid, VALUE, content)
+		VALUES 
+			<foreach collection="jsonArray" item="archiveMap" separator=",">
+				(
+					#{info_id}, 
+					#{archiveMap.archiveid}, 
+					#{archiveMap.archive_value}, 
+					#{archiveMap.archive_content}
+				)
+			</foreach>
+	</insert>
+	
+	
+	<!-- 验证information重复性（根据title） -->
+	<select id="checkRepeat" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT * FROM t_information
+		WHERE title = #{title}
+	</select>
+	
+	<!-- 更改information -->
+	<update id="updateInformation" parameterType="java.util.Map">
+		<choose>
+			<when test="start_time != null and end_time != null">
+					UPDATE t_information
+					SET program_id = #{program_id}, title = #{title}, content = #{content}, use_status = #{use_status},
+						doc_name = #{doc_name}, image_name = #{image_name}, start_time = #{start_time},
+						end_time = #{end_time}, modifytime = NOW(), author = #{author}, operatorid = #{operatorid}
+					WHERE info_id = #{info_id}
+			</when>
+			<otherwise>
+					UPDATE t_information 
+					SET program_id = #{program_id}, title = #{title}, content = #{content}, use_status = #{use_status},
+						doc_name = #{doc_name}, image_name = #{image_name}, modifytime = NOW(), 
+						author = #{author}, operatorid = #{operatorid}
+					WHERE info_id = #{info_id}
+			</otherwise>
+		</choose>
+	</update>
+	
+	<!-- 删除information -->
+	<delete id="deleteInformation" parameterType="java.lang.String">
+		DELETE FROM t_information WHERE info_id = #{info_id}
+	</delete>
+	
+	<!-- 删除information的归档属性 -->
+	<delete id="deleteArchive" parameterType="java.lang.String">
+		DELETE FROM rel_info_archive WHERE info_id = #{info_id}
+	</delete>
+	
+	<!-- 更改information可用状态(0禁用， 1可用) -->
+	<update id="auditInformationStatus" parameterType="java.util.Map">
+		UPDATE t_information SET audit_flag = #{audit_flag}
+		WHERE info_id = #{info_id}
+	</update>
+	
+	<!-- archive 和 InformationArchive 一对多映射 -->
+	<resultMap type="com.cp.bean.ArchiveInfoCustom" id="archiveAndInfoArchiveResultMap">
+		<id column="archiveid" property="archiveid"/>
+		<result column="archivename" property="archivename"/>
+		
+		<!-- InformationArchive -->
+		<collection property="infoArlist" ofType="com.cp.bean.InformationArchive">
+			<id column="id" property="id"/>
+			<result column="info_id" property="info_id"/>
+			<result column="archiveid" property="archiveid"/>
+			<result column="value" property="value"/>
+			<result column="content" property="content"/>
+		</collection>
+	</resultMap>
+	
+	<!-- 查找当前information的归档信息（根据info_id查询） -->
+	<select id="findInformationArchive" parameterType="java.lang.String" resultMap="archiveAndInfoArchiveResultMap">
+		SELECT ta.archiveid, ta.archivename, ria.* FROM rel_info_archive ria
+		JOIN t_archive ta ON ria.archiveid = ta.archiveid
+		WHERE ria.info_id = #{info_id}
+	</select>
+	
+	<!-- 根据id查询info -->
+	<select id="getInfoByInfoId" parameterType="java.lang.String" resultType="java.util.Map">
+		SELECT * FROM t_information
+		WHERE info_id = #{info_id}
+	</select>
+
+	
+	<!-- 根据归档查看用户能够查看某一栏目的所有info -->
+	<select id="getInfoListByArchiveAndProId" parameterType="java.util.Map" resultMap="infoResultMap">
+		SELECT DISTINCT i.* FROM t_theater t
+		JOIN rel_theater_archive rta ON t.theaterid = rta.theaterid
+		JOIN rel_info_archive ria ON ria.archiveid = rta.archiveid
+		JOIN t_information i ON i.info_id = ria.info_id
+		WHERE rta.value = ria.value AND t.theaterid = #{theaterid} AND i.program_id = #{program_id}
+		<if test="criteria != null">
+			AND i.title LIKE '%${criteria}%'
+		</if>
+		ORDER BY i.createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	<!-- 查询count -->
+	<select id="getInfoListByArchiveAndProIdCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(DISTINCT i.info_id) FROM t_theater t
+		JOIN rel_theater_archive rta ON t.theaterid = rta.theaterid
+		JOIN rel_info_archive ria ON ria.archiveid = rta.archiveid
+		JOIN t_information i ON i.info_id = ria.info_id
+		WHERE rta.value = ria.value AND t.theaterid = #{theaterid} AND i.program_id = #{program_id}
+		<if test="criteria != null">
+			AND i.title LIKE '%${criteria}%'
+		</if>
+	</select>
+	
+	
+	<!-- 查询某一栏目的所有info -->
+	<select id="getAllInfoByProId" parameterType="java.util.Map" resultMap="infoResultMap">
+		SELECT DISTINCT i.* FROM t_information i
+		WHERE i.program_id = #{program_id}
+		<if test="criteria != null">
+			AND i.title LIKE '%${criteria}%'
+		</if>
+		ORDER BY createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	<!-- 查询count -->
+	<select id="getAllInfoByProIdCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(DISTINCT i.info_id) FROM t_information i
+		WHERE i.program_id = #{program_id}
+		<if test="criteria != null">
+			AND i.title LIKE '%${criteria}%'
+		</if>
+	</select>
+	
+	<!-- 文章resultMap -->
+	<resultMap type="com.cp.bean.Information" id="infoResultMap">
+		<id column="info_id" property="info_id"/>
+		<result column="program_id" property="program_id"/>
+		<result column="title" property="title"/>
+		<result column="content" property="content"/>
+		<result column="use_status" property="use_status"/>
+		
+		<result column="brows_times" property="brows_times"/>
+		<result column="doc_name" property="doc_name"/>
+		<result column="audit_flag" property="audit_flag"/>
+		<result column="image_name" property="image_name"/>
+		<result column="start_time" property="start_time"/>
+		
+		<result column="end_time" property="end_time"/>
+		<result column="createtime" property="createtime"/>
+		<result column="modifytime" property="modifytime"/>
+		<result column="author" property="author"/>
+		<result column="operatorid" property="operatorid"/>
+	</resultMap>
+	
+	<!-- 如果登陆用户是影院用户(roletype==2) ,则根据归档查看所有可看的info列表(查询所有启用栏目的info) -->
+	<select id="findAvaiableInfoList" parameterType="java.util.Map" resultMap="infoResultMap">
+		SELECT DISTINCT i.* FROM t_theater t
+		JOIN rel_theater_archive rta ON t.theaterid = rta.theaterid
+		JOIN rel_info_archive ria ON ria.archiveid = rta.archiveid
+		JOIN t_information i ON i.info_id = ria.info_id
+		JOIN t_program tp ON i.program_id = tp.program_id
+		WHERE rta.value = ria.value AND t.theaterid = #{theaterid} AND tp.status = 1
+		<if test="criteria != null">
+			AND i.title LIKE '%${criteria}%'
+		</if>
+		ORDER BY i.createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	<!-- 查询count -->
+	<select id="findAvaiableInfoListCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(DISTINCT i.info_id) FROM t_theater t
+		JOIN rel_theater_archive rta ON t.theaterid = rta.theaterid
+		JOIN rel_info_archive ria ON ria.archiveid = rta.archiveid
+		JOIN t_information i ON i.info_id = ria.info_id
+		JOIN t_program tp ON i.program_id = tp.program_id
+		WHERE rta.value = ria.value AND t.theaterid = #{theaterid} AND tp.status = 1
+		<if test="criteria != null">
+			AND i.title LIKE '%${criteria}%'
+		</if>
+	</select>
+	
+	
+	<!-- 如果登陆用户是系统用户或者院线用户，则可以查看所有栏目的所有info -->
+	<select id="getAllInfoList" parameterType="java.util.Map" resultMap="infoResultMap">
+		SELECT DISTINCT i.* FROM t_information i
+		JOIN t_program tp ON i.program_id = tp.program_id
+		WHERE tp.status = 1
+		<if test="criteria != null">
+			AND i.title LIKE '%${criteria}%'
+		</if>
+		ORDER BY createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	<!-- 查询count -->
+	<select id="getAllInfoListCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(DISTINCT i.info_id) FROM t_information i
+		JOIN t_program tp ON i.program_id = tp.program_id
+		WHERE tp.status = 1
+		<if test="criteria != null">
+			AND i.title LIKE '%${criteria}%'
+		</if>
+	</select>
+	
+	<!-- 查找影院用户能够看到的最新的文章列表(自该用户上次登录之后) -->
+	<select id="findLatestAvaiableInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT DISTINCT i.* FROM t_theater t
+		JOIN rel_theater_archive rta ON t.theaterid = rta.theaterid
+		JOIN rel_info_archive ria ON ria.archiveid = rta.archiveid
+		JOIN t_information i ON i.info_id = ria.info_id
+		WHERE rta.value = ria.value AND t.theaterid = #{theaterid}
+				AND i.createtime > (<include refid="findLastLoginTime"/>)
+		ORDER BY i.createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	<!-- 查询count -->
+	<select id="findLatestAvaiableInfoListCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(DISTINCT i.info_id) FROM t_theater t
+		JOIN rel_theater_archive rta ON t.theaterid = rta.theaterid
+		JOIN rel_info_archive ria ON ria.archiveid = rta.archiveid
+		JOIN t_information i ON i.info_id = ria.info_id
+		WHERE rta.value = ria.value AND t.theaterid = #{theaterid}
+				AND i.createtime > (<include refid="findLastLoginTime"/>)
+	</select>
+	
+	
+	<!-- 查找系统/院线用户能够看到的最新的文章列表（自上次登录之后的info列表(不是自己添加的)） -->
+	<select id="getLatestAllInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT DISTINCT i.* FROM t_information i
+		WHERE i.createtime > (<include refid="findLastLoginTime"/>)
+			AND operatorid != #{userid}
+		ORDER BY createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	<!-- 查找count -->
+	<select id="getLatestAllInfoListCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(DISTINCT i.info_id) FROM t_information i
+		WHERE i.createtime > (<include refid="findLastLoginTime"/>)
+			AND operatorid != #{userid}
+	</select>
+
+
+	<!-- 查找当前用户的上一次登陆时间 -->
+	<sql id="findLastLoginTime">
+		SELECT IFNULL(CREATE_TIME, '1970-01-01 00:00:01') FROM t_log
+        WHERE REQUEST_URI LIKE '%/user/login%' AND USERID = #{userid}
+        ORDER BY CREATE_TIME DESC
+        LIMIT 1, 1
+    </sql>
+	
+	
+</mapper>

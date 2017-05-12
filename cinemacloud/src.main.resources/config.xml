@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+	<!-- 接口地址 -->
+	<!-- <service url="http://wx.yidepiao.cn:8888/cinemapay/" /> -->
+	<service url="http://localhost:8000" />
+
+	<!-- 导出文件保存路径 -->
+	<path file="D:\soft_devolep\apache-tomcat\Tomcat-8080-cinemacloud\webapps\upload" />
+
+	<!-- mongDB配置 -->
+	<!--<MongoDB host="192.168.190.3" dbname="test" collname="java" user="" pass="i" />-->
+
+	<!-- kafka配置-->
+	<kafka topic="Log" zookeeper="192.168.195.5:2181" broker="192.168.195.5:9092"/>
+
+	<!-- 七牛上传文件配置 [bucket:命名空间] -->
+	<QN access="mPpX0Emlz3cuB1hObHC_yIq9_jSwYHyl-IpRCFsf" secret="hZaWCi1xbb5gobdavtEf0SZQb8H0fHxJ530zht6F" bucket="stone" prefix="http://7xkyb0.com1.z0.glb.clouddn.com/"></QN>
+</config>

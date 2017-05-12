@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="program">
+
+	<!-- 添加information栏目信息 -->
+	<insert id="addProgram" parameterType="java.util.Map">
+		<selectKey keyProperty="program_id" order="AFTER" resultType="java.lang.Integer">
+			SELECT LAST_INSERT_ID()
+		</selectKey>
+		INSERT INTO t_program(program_name) VALUES(#{program_name})
+	</insert>
+	
+	<!-- 验证栏目名重复性 -->
+	<select id="checkRepeat" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT * FROM t_program
+		WHERE program_name = #{program_name}
+	</select>
+	
+	<!-- 添加栏目归档属性 -->
+	<insert id="addArchive" parameterType="java.util.Map">
+		INSERT INTO rel_program_archive(program_id, archiveid, VALUE, content)
+		VALUES
+			<foreach collection="jsonArray" item="archiveMap" separator=",">
+				(
+						#{program_id},
+						#{archiveMap.archiveid}, 
+						#{archiveMap.archive_value}, 
+						#{archiveMap.archive_content}
+				)
+			</foreach>
+	</insert>
+	
+	<!-- 根据栏目查询information -->
+	<select id="findInfoByProgram" parameterType="java.lang.Integer" resultType="java.util.Map">
+		SELECT *
+		FROM t_information
+		WHERE program_id = #{program_id}
+	</select>
+	
+	<!-- 删除空栏目 -->
+	<delete id="deleteProgram" parameterType="java.lang.Integer">
+		DELETE FROM t_program
+		WHERE program_id = #{program_id}
+	</delete>
+	
+	<!-- 删除空栏目的归档属性 -->
+	<delete id="deleteArchive" parameterType="java.lang.Integer">
+		DELETE FROM rel_program_archive
+		WHERE program_id = #{program_id}
+	</delete>
+	
+	<!-- 更新栏目的栏目信息(名称) -->
+	<update id="updateProgram" parameterType="java.util.Map">
+		UPDATE t_program 
+				SET program_name = #{program_name},
+					modifytime = NOW()
+		WHERE program_id = #{program_id}
+	</update>
+	
+	<!-- 根据栏目id查询栏目名称 -->
+	<select id="findProgramNameById" parameterType="java.lang.String" resultType="java.lang.String">
+		SELECT program_name FROM t_program WHERE program_id = #{program_id}
+	</select>
+	
+	
+	<!-- 更改栏目的可用状态 -->
+	<update id="changeProgramStatus" parameterType="java.util.Map">
+		UPDATE t_program 
+			SET `status` = #{status},
+				modifytime = NOW()
+		WHERE program_id = #{program_id}
+	</update>
+
+	
+	<!-- 栏目resultMap -->
+	<resultMap type="com.cp.bean.Program" id="programResultMap">
+		<id column="program_id" property="program_id"/>
+		<result column="program_name" property="program_name"/>
+		<result column="status" property="status"/>
+		<result column="createtime" property="createtime"/>
+		<result column="modifytime" property="modifytime"/>
+	</resultMap>
+	
+	<!-- 根据影院归档查询其可看的目录(program) -->
+	<select id="getProgramListByArchive" parameterType="java.util.Map" resultMap="programResultMap">
+		SELECT DISTINCT p.* FROM t_theater t
+		JOIN rel_theater_archive rta ON t.theaterid = rta.theaterid
+		JOIN rel_program_archive rpa ON rpa.archiveid = rta.archiveid
+		JOIN t_program p ON p.program_id = rpa.program_id
+		WHERE rta.value = rpa.value AND t.theaterid = #{theaterid}
+		ORDER BY p.createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	<!-- 查找count -->
+	<select id="getProgramListByArchiveCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(DISTINCT p.program_id) FROM t_theater t
+		JOIN rel_theater_archive rta ON t.theaterid = rta.theaterid
+		JOIN rel_program_archive rpa ON rpa.archiveid = rta.archiveid
+		JOIN t_program p ON p.program_id = rpa.program_id
+		WHERE rta.value = rpa.value AND t.theaterid = #{theaterid}
+		ORDER BY p.createtime DESC 
+	</select>
+	
+	
+	
+	<!-- 查询所有栏目 -->
+	<select id="getAllProgram" parameterType="java.util.Map" resultMap="programResultMap">
+		SELECT DISTINCT p.* FROM t_program p
+		ORDER BY createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	
+	<!-- 查找count -->
+	<select id="getAllProgramCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(DISTINCT p.program_id) FROM t_program p
+	</select>
+	
+	<!-- 归档属性与栏目归档属性映射（Archive与ProgramArchive） -->
+	<resultMap type="com.cp.bean.Archive" id="archiveAndProgramArchiveResultMap">
+		<!-- 主键 -->
+		<id column="archiveid" property="archiveid"/>
+		<result column="archivename" property="archivename"/>
+		<!-- 	private List<ProgramArchive> parlist; -->
+		<collection property="parlist" ofType="com.cp.bean.ProgramArchive">
+			<id column="id" property="id"/>
+			<result column="program_id" property="program_id"/>
+			<result column="archiveid" property="archiveid"/>
+			<result column="value" property="value"/>
+			<result column="content" property="content"/>
+		</collection>
+	</resultMap>
+	
+	<!-- 根据栏目id查询栏目的归档属性 -->
+	<select id="findProgramArchive" parameterType="java.lang.Integer" resultMap="archiveAndProgramArchiveResultMap">
+		SELECT ta.archiveid, ta.archivename, rpa.* FROM rel_program_archive rpa
+		JOIN t_archive ta ON rpa.archiveid = ta.archiveid
+		WHERE program_id = #{program_id}
+	</select>
+
+</mapper>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+
+	<mappers>
+	
+		<mapper resource="com/rest/user/User-Mapper.xml"/>
+		<mapper resource="com/rest/materiel/dao/Materiel-Mapper.xml"/>
+		<mapper resource="com/rest/ffers/dao/Ffers-Mapper.xml"/>
+		<mapper resource="com/rest/bill/dao/Bill-Mapper.xml" />
+		<mapper resource="com/rest/template/dao/Template-Mapper.xml" />
+		
+		<mapper resource="com/rest/user/User-Mapper.xml"/>
+		
+		<mapper resource="com/rest/user/User-Mapper.xml"/>
+		<mapper resource="com/rest/user/role/Role-Mapper.xml"/>
+		<mapper resource="com/rest/zone/Zone-Mapper.xml"/>
+		<mapper resource="com/rest/theater/Theater-Mapper.xml"/>
+		
+		<mapper resource="com/rest/content/program/dao/Program-Mapper.xml"/>
+		<mapper resource="com/rest/content/information/Information-Mapper.xml"/>
+		<mapper resource="com/rest/menu/Menu-Mapper.xml"/>
+		<mapper resource="com/rest/archive/Archive-Mapper.xml"/>
+		
+		<mapper resource="com/rest/log/dao/Log-Mapper.xml"/>
+		<mapper resource="com/rest/activity/dao/Activity-Mapper.xml"/>
+
+	</mappers>
+
+</configuration>

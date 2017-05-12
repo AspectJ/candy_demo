@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="activity">
+    <!--添加活动通知 -->
+    <insert id="addActivity" parameterType="java.util.Map">
+        <selectKey keyProperty="activityid" resultType="java.lang.Integer" order="AFTER">
+            SELECT LAST_INSERT_ID()
+        </selectKey>
+        INSERT INTO t_activity(title, `type`, content, starttime, endtime, operatorid, createtime)
+        VALUES(#{title}, #{type}, #{content}, #{starttime}, #{endtime}, #{operatorid}, NOW())
+    </insert>
+
+    <!-- checkRepeat -->
+    <select id="checkRepeat" parameterType="java.util.Map" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM t_activity
+        WHERE title = #{title}
+    </select>
+
+    <!-- 添加活动关联的影院-->
+    <insert id="addActivityTheater" parameterType="java.util.Map">
+        INSERT INTO rel_activity_theater(activityid, theaterid, roleids, status) VALUES
+        <foreach collection="theaterids" item="theaterid" separator=",">
+            (#{activityid},#{theaterid}, #{roleids}, 0)
+        </foreach>
+    </insert>
+
+    <!-- 删除活动 -->
+    <delete id="deleteActivity" parameterType="java.lang.String">
+        DELETE FROM t_activity
+        WHERE activityid = #{activityid}
+    </delete>
+
+    <!-- 删除影院回复信息 -->
+    <delete id="deleteActivityTheater" parameterType="java.lang.String">
+        DELETE FROM rel_activity_theater
+        WHERE activityid = #{activityid}
+    </delete>
+
+
+    <!-- 系统用户或者院线用户可以查询所有通知列表 -->
+    <select id="findActivityBatch" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT * FROM t_activity
+        <if test="criteria != null">
+            WHERE title LIKE '%${criteria}%'
+        </if>
+        ORDER BY createtime desc
+        <if test="offsetNum != null and limitSize != null">
+            LIMIT #{offsetNum}, #{limitSize}
+        </if>
+    </select>
+
+    <!-- 查询count -->
+    <select id="findActivityBatchCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM t_activity
+        <if test="criteria != null">
+            WHERE title LIKE '%${criteria}%'
+        </if>
+    </select>
+
+    <!-- 得到第一个批次的前十条数据 -->
+    <select id="getFirstBatchDetailPreTen" parameterType="java.lang.Integer" resultType="java.util.Map">
+        SELECT rat.*, tt.theatername, tt.theaternum FROM t_activity ta
+        LEFT OUTER JOIN rel_activity_theater rat ON ta.activityid = rat.activityid
+        LEFT OUTER JOIN t_theater tt ON rat.theaterid = tt.theaterid
+        WHERE ta.activityid = #{activityid}
+        LIMIT 0, 10
+    </select>
+    
+    <!-- 得到第一个批次的总数count -->
+    <select id="getFirstBatchDetailCount" parameterType="java.lang.Integer" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM rel_activity_theater
+        WHERE activityid = #{activityid}
+    </select>
+
+    <!-- 根据活动id查询活动 -->
+    <select id="findActivityById" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT * FROM t_activity
+        WHERE activityid = #{activityid}
+    </select>
+
+    <!-- 根据活动id查询活动批次的详细信息(关联的影院及其角色信息) -->
+    <select id="findRel_Activity_theater" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT rat.*, tt.theatername, tt.theaternum FROM t_activity ta
+        LEFT OUTER JOIN rel_activity_theater rat ON ta.activityid = rat.activityid
+        LEFT OUTER JOIN t_theater tt ON rat.theaterid = tt.theaterid
+        WHERE ta.activityid = #{activityid}
+        <!-- 根据影院条件查询 -->
+        <if test="theatername != null">
+            AND tt.theatername LIKE '%${theatername}%'
+        </if>
+        <if test="theaternum != null">
+            AND tt.theaternum = #{theaternum}
+        </if>
+        <!--
+                如果该条活动通知type=0[status 0-初始状态 1-已阅]
+                如果该条活动通知type=1[status -1-不参加 0-初始状态 1-已参加]
+        -->
+        <if test="status != null">
+            AND rat.status = #{status}
+        </if>
+        <if test="offsetNum != null and limitSize != null">
+            LIMIT #{offsetNum}, #{limitSize}
+        </if>
+    </select>
+
+    <!-- 查询某一个批次关联影院信息的条数count -->
+    <select id="findRel_Activity_theaterCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM t_activity ta
+        LEFT OUTER JOIN rel_activity_theater rat ON ta.activityid = rat.activityid
+        LEFT OUTER JOIN t_theater tt ON rat.theaterid = tt.theaterid
+        WHERE ta.activityid = #{activityid}
+        <!-- 根据影院条件查询 -->
+        <if test="theatername != null">
+            AND tt.theatername LIKE '%${theatername}%'
+        </if>
+        <if test="theaternum != null">
+            AND tt.theaternum = #{theaternum}
+        </if>
+        <if test="type != null">
+            AND ta.type = #{type}
+            <!-- type=0[status 0-初始状态 1-已阅] type=1[status -1-不参加 0-初始状态 1-已参加] -->
+            <if test="status != null">
+                AND rat.status = #{status}
+            </if>
+        </if>
+    </select>
+
+
+    <!-- 影院用户只能查看自己影院并且自己所属角色能够有权限查看的活动通知 -->
+    <select id="findAvaiableActivityList" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT ta.*, rat.*, tt.theatername, tt.theaternum FROM t_activity ta
+        LEFT OUTER JOIN rel_activity_theater rat ON ta.activityid = rat.activityid
+        LEFT OUTER JOIN t_theater tt ON rat.theaterid = tt.theaterid
+        WHERE rat.theaterid = #{theaterid} AND roleids LIKE '%${roleid},%'
+        <if test="criteria != null">
+            AND ta.title LIKE '%${criteria}%'
+        </if>
+        <if test="type != null">
+            AND ta.type = #{type}
+            <!-- type=0[status 0-初始状态 1-已阅] type=1[status -1-不参加 0-初始状态 1-已参加] -->
+            <if test="status != null">
+                AND rat.status = #{status}
+            </if>
+        </if>
+        ORDER BY ta.createtime DESC
+        <if test="offsetNum != null and limitSize != null">
+            LIMIT #{offsetNum}, #{limitSize}
+        </if>
+    </select>
+
+    <!-- 查找count -->
+    <select id="findAvaiableActivityListCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM t_activity ta
+        LEFT OUTER JOIN rel_activity_theater rat ON ta.activityid = rat.activityid
+        LEFT OUTER JOIN t_theater tt ON rat.theaterid = tt.theaterid
+        WHERE rat.theaterid = #{theaterid} AND roleids LIKE '%${roleid},%'
+        <if test="criteria != null">
+            AND ta.title LIKE '%${criteria}%'
+        </if>
+        <if test="type != null">
+            AND ta.type = #{type}
+            <!-- type=0[status 0-初始状态 1-已阅] type=1[status -1-不参加 0-初始状态 1-已参加] -->
+            <if test="status != null">
+                AND rat.status = #{status}
+            </if>
+        </if>
+    </select>
+
+    <!-- 影院用户对活动通知确认操作 -->
+    <update id="confirmActivity" parameterType="java.util.Map">
+        <choose>
+            <!-- 普通文本 status == 1 表示已查阅-->
+            <when test="type == 0">
+                UPDATE rel_activity_theater SET `status` = 1, answererid = #{userid}
+                WHERE activityid = #{activityid} AND theaterid = #{theaterid}
+            </when>
+            <otherwise>
+                UPDATE rel_activity_theater SET `status` = #{status}, doc_url = #{doc_url}, answererid = #{userid}
+                WHERE activityid = #{activityid} AND theaterid = #{theaterid}
+            </otherwise>
+        </choose>
+    </update>
+
+    <select id="getActivityDetail" parameterType="java.lang.Integer" resultType="java.util.Map">
+        SELECT  ta.title,rat.activityid,ta.content,ta.type,ta.starttime,ta.endtime,tt.theatername,rat.status,rat.doc_url,rat.theaterid,rat.roleids,tu.username FROM rel_activity_theater rat
+        LEFT JOIN t_activity ta ON  rat.activityid=ta.activityid
+        LEFT JOIN t_theater tt ON  tt.theaterid=rat.theaterid
+        LEFT JOIN t_userinfo tu ON rat.answererid=tu.userid
+        WHERE  rat.id=#{id}
+    </select>
+
+    <select id="getActivityDetailByactivityid" parameterType="java.lang.Integer" resultType="java.util.Map">
+        SELECT rat.*, tt.theatername, tt.theaternum,tu.userid FROM t_activity ta
+        LEFT OUTER JOIN rel_activity_theater rat ON ta.activityid = rat.activityid
+        LEFT OUTER JOIN t_theater tt ON rat.theaterid = tt.theaterid
+        LEFT  JOIN  t_userinfo tu ON rat.theaterid=tu.theaterid
+        WHERE ta.activityid =#{activityid}  and tu.audit_flag=1 and tu.status=1
+
+
+    </select>
+
+
+    
+    <!-- 影院用户登录之后查看未处理的活动通知 -->
+    <select id="getAvailableLatestActivity" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT ta.activityid, ta.title FROM t_activity ta
+        LEFT OUTER JOIN rel_activity_theater rat ON ta.activityid = rat.activityid
+        WHERE rat.theaterid = #{theaterid}
+            AND rat.roleids LIKE '%${roleid},%'
+            AND rat.status = 0
+    </select>
+
+    <!-- 查找count -->
+    <select id="getAvailableLatestActivityCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM t_activity ta
+        LEFT OUTER JOIN rel_activity_theater rat ON ta.activityid = rat.activityid
+        WHERE rat.theaterid = #{theaterid}
+            AND rat.roleids LIKE '%${roleid},%'
+            AND rat.status = 0
+    </select>
+
+    <!-- 查询系统/院线用户全部最新的活动通知 -->
+    <select id="getAllLatestActivity" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT activityid, title FROM t_activity
+        WHERE operatorid != #{userid}
+            AND createtime > (<include refid="information.findLastLoginTime"/>)
+    </select>
+
+    <!-- 查询count -->
+    <select id="getAllLatestActivityCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM t_activity
+        WHERE operatorid != #{userid}
+        AND createtime > (<include refid="information.findLastLoginTime"/>)
+    </select>
+
+
+</mapper>

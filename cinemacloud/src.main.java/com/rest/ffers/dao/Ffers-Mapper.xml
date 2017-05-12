@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="ffers">
+
+	<!-- 新增批次 -->	
+	<!-- <insert id="insertFfersList" parameterType="java.util.List" useGeneratedKeys="true" keyColumn="theaterid">
+		insert into t_theater( theaternum,theatername,theaterphone,theateraddress,description,createtime,modifytime) 
+			values 
+	 <foreach item="item" collection="list" separator=",">
+    (#{item.theaternum}, #{item.theatername}, #{item.theaterphone}, #{item.theateraddress}, #{item.description}, #{item.createtime}, #{item.modifytime})
+  </foreach>
+	</insert> -->
+	
+	<!-- 新增回盘批次 -->	
+	<insert id="insertFfersBatch" parameterType="java.util.Map" useGeneratedKeys="true" keyProperty="ffersconfid" keyColumn="ffersconfid">
+		insert into t_ffers_conf( ffersconfname,operatorid,createtime) 
+			values 
+		(#{ffersconfname},#{operatorid},#{createtime})
+	</insert>
+	
+	<!-- 更新回盘批次 -->	
+	<update id="updateFfersBatch" parameterType="java.util.Map">
+		update t_ffers_conf set modifytime = #{modifytime}
+		<if test="ffersconfname != null">
+			, ffersconfname = #{ffersconfname}
+		</if>
+		<if test="operatorid != null">
+			, operatorid = #{operatorid}
+		</if>
+		where ffersconfid = #{ffersconfid}
+	</update>
+	
+	<!-- 删除回盘批次 -->
+	<delete id="deleteFfersBatch" parameterType="java.util.Map">
+		DELETE FROM t_ffers_conf where ffersconfid = #{ffersconfid}
+	</delete>
+	
+	
+	<!-- 查询回盘批次总数 -->
+	<select id="queryFfersBatchCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(*) as count FROM t_ffers_conf
+		<where>
+			<if test="ffersconfname != null"> and ffersconfname like #{ffersconfname} </if>
+		</where>
+	</select>
+	
+	<!-- 查询回盘批次列表 -->
+	<select id="queryFfersBatchList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT ffersconfid, ffersconfname,createtime,modifytime FROM t_ffers_conf
+		<where>
+			<if test="ffersconfname != null"> and ffersconfname like #{ffersconfname} </if>
+		</where>
+		order by createtime desc
+ 		<if test="start != null and pagesize != null"> 
+ 			limit #{pagesize} offset #{start} 
+ 		</if>
+	</select>
+	
+	<!-- 新增回盘通知 -->	
+	<insert id="insertFfers" parameterType="java.util.Map" useGeneratedKeys="true" keyProperty="ffersid" keyColumn="ffersid">
+		insert into t_ffers( ffersconfid,theaterid,content,status,operatorid,createtime,sendtime)
+			values 
+		(#{ffersconfid},#{theaterid},#{content},#{status},#{operatorid},#{createtime},#{sendtime})
+	</insert>
+	
+	<update id="updateFfers" parameterType="java.util.Map">
+		UPDATE t_ffers set modifytime = #{modifytime}
+		<if test="status != null">, status = #{status}</if>
+		<if test="operatorid != null">, operatorid = #{operatorid}</if>
+		<if test="logistics != null">, logistics = #{logistics}</if>
+        <if test="waybill != null">, waybill = #{waybill}</if>
+		<where>
+			ffersid = #{ffersid}
+		</where>
+	</update>
+	
+	<!-- 删除回盘通知 -->
+	<delete id="deleteFfers" parameterType="java.util.Map">
+		DELETE FROM t_ffers
+		<where>
+			<!-- 通过回盘批次id删除 -->
+			<if test="ffersconfid != null">and ffersconfid = #{ffersconfid}</if>
+			<!-- 通过回盘通知id删除 -->
+			<if test="ffersid != null">and ffersid = #{ffersid}</if>
+		</where>
+	</delete>
+	
+	<sql id="queryFfersListCondition">
+		<where>
+			<if test="ffersconfid != null"> and tf.ffersconfid = #{ffersconfid} </if>
+			<if test="ffersid != null"> and tf.ffersid = #{ffersid} </if>
+			<if test="theatername != null"> and tt.theatername like #{theatername} </if>
+			<if test="theaternum != null"> and tt.theaternum like #{theaternum} </if>
+			<if test="ffersconfname != null"> and tfc.ffersconfname like #{ffersconfname} </if>
+			<if test="moviename != null"> and tf.moviename like #{moviename} </if>
+			<if test="theaterid != null">and tf.theaterid=#{theaterid}</if>
+			<if test="status !=null and status!= '' ">and tf.status=#{status}</if>
+			<if test="s_time!=null and s_time!='' and e_time!=null and e_time!=''"> and tf.sendtime between #{s_time} and #{e_time} </if>
+		</where>
+	</sql>
+	
+	<!-- 查询回盘通知总数 -->
+	<select id="queryFfersListCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(*) as count FROM t_ffers tf
+		left join t_theater tt on tf.theaterid=tt.theaterid
+		left join t_ffers_conf tfc on tf.ffersconfid=tfc.ffersconfid
+		<include refid="queryFfersListCondition"></include>
+	</select>
+	
+	<!-- 查询回盘通知列表 -->
+	<select id="queryFfersList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT tf.ffersid,tf.ffersconfid,tf.moviename,tf.diskcode,tf.waybill,tf.logistics,tf.theaterid,tt.theaternum,tt.theatername,tf.status,tf.sendtime,tf.createtime FROM t_ffers tf
+		left join t_theater tt on tf.theaterid=tt.theaterid
+		left join t_ffers_conf tfc on tf.ffersconfid=tfc.ffersconfid
+		<include refid="queryFfersListCondition"></include>
+		order by tf.createtime desc
+ 		<if test="start != null and pagesize != null"> 
+ 			limit #{pagesize} offset #{start} 
+ 		</if>
+	</select>
+	
+	<!-- 根据ffersid集合批量查询查询物料列表 -->
+	<select id="queryFfersListByIds" parameterType="java.util.List" resultType="java.util.Map">
+		SELECT tf.ffersid,tf.ffersconfid,tfc.ffersconfname,tf.moviename,tf.diskcode,tf.theaterid,tt.theaternum,tt.theatername,tf.status,tf.sendtime,tf.createtime,tt.theatername,tu.userid FROM t_ffers tf
+		join t_theater tt on tf.theaterid=tt.theaterid
+		left join t_ffers_conf tfc on tfc.ffersconfid=tf.ffersconfid
+		left join t_userinfo  tu on tu.theaterid=tf.theaterid
+		left join t_role tr on tr.roleid=tu.roleid
+		WHERE tf.ffersid IN
+		<foreach item="item" collection="list" separator="," open="(" close=")">
+    			#{item}
+  		</foreach>
+  		and (tr.rolename like '%运营%' or tr.rolename like '%影院管理员%')
+	</select>
+	
+	<!-- 批量添加回盘通知 -->
+	<insert id="insertFfersList" parameterType="java.util.Map" useGeneratedKeys="true" keyColumn="ffersid" keyProperty="ffersid">
+		
+		insert into t_ffers( ffersconfid,theaterid,createtime,moviename,diskcode,customer,customer_phone,status)
+		values 
+		<foreach item="item" collection="list" separator=",">
+	    (#{item.ffersconfid}, #{item.theaterid}, #{item.createtime}, #{item.moviename}, #{item.diskcode},#{item.customer},#{item.customer_phone},#{item.status})
+	    </foreach>
+	</insert>
+	
+	<!-- 批量删除回盘通知 -->
+	<delete id="deleteFfersList" parameterType="java.util.List" >
+		delete from t_Ffers where ffersid in 
+			<foreach collection="list" item="item" separator="," open="(" close=")" >
+				#{item}
+			</foreach>
+	</delete>
+	
+	<!-- 更新回盘通知发送状态 -->
+	<update id="updateFfersByIds" parameterType="java.util.List">
+	
+		<foreach collection="list" item="item" separator=";">
+			UPDATE t_ffers set modifytime = #{item.modifytime},status=1
+			<where>
+				ffersid = #{item.ffersid}
+			</where>
+		</foreach>
+	</update>
+
+	<select id="getUserid" parameterType="java.util.List" resultType="java.util.Map">
+		SELECT userid,ffersid,moviename,diskcode,ffersconfname,theatername FROM t_ffers tf
+		  JOIN  t_userinfo tu ON tf.theaterid=tu.theaterid
+		  JOIN  t_ffers_conf tfc ON  tf.ffersconfid=tfc.ffersconfid
+		  JOIN t_theater tt ON tt.theaterid=tf.theaterid
+		  WHERE roleid IN (70,78) AND ffersid IN
+			<foreach collection="list" item="item" separator="," open="(" close=")" >
+				#{item}
+			</foreach>
+	</select>
+
+</mapper>

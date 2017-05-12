@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Maven: com.baidu.disconf:disconf-client:2.6.32">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/baidu/disconf/disconf-client/2.6.32/disconf-client-2.6.32.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/com/baidu/disconf/disconf-client/2.6.32/disconf-client-2.6.32-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/baidu/disconf/disconf-client/2.6.32/disconf-client-2.6.32-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

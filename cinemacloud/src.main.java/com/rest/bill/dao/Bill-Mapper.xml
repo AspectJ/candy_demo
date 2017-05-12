@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="bill">
+
+	<!-- 批量添加影院 -->	
+	<!-- <insert id="insertMaterielList" parameterType="java.util.List" useGeneratedKeys="true" keyColumn="theaterid">
+		insert into t_theater( theaternum,theatername,theaterphone,theateraddress,description,createtime,modifytime) 
+			values 
+	 <foreach item="item" collection="list" separator=",">
+    (#{item.theaternum}, #{item.theatername}, #{item.theaterphone}, #{item.theateraddress}, #{item.description}, #{item.createtime}, #{item.modifytime})
+  </foreach>
+	</insert> -->
+	
+	<!-- 新增账单批次 -->	
+	<insert id="saveBillconf" parameterType="java.util.Map" useGeneratedKeys="true" keyProperty="billconfid" keyColumn="billconfid">
+		insert into t_bill_conf( billconfname,operatorid,createtime) 
+			values 
+		(#{billconfname},#{operatorid},#{createtime})
+	</insert>
+	
+	<!-- 更新账单批次 -->	
+	<update id="updateBillconf" parameterType="java.util.Map" >
+		update t_bill_conf set modifytime = #{modifytime}
+		<if test="billconfname != null">
+			, billconfname = #{billconfname}
+		</if>
+		<if test="operatorid != null">
+			, operatorid = #{operatorid}
+		</if>
+		where billconfid = #{billconfid}
+	</update>
+	
+	<!-- 删除账单批次,同时删除该批次下的所有账单 -->
+	<delete id="removeBillconf" parameterType="java.util.Map">
+		DELETE t_bill,t_bill_conf FROM t_bill_conf  LEFT JOIN t_bill  ON t_bill_conf.billconfid=t_bill.billconfid where t_bill_conf.billconfid=#{billconfid} 
+	</delete>
+	
+	<sql id="getBillconfCondition">
+		<where>
+			<if test="billconfid != null">and billconfid = #{billconfid}</if>
+			<if test="billconfname != null">and billconfname like #{billconfname}</if>
+		</where>
+	</sql>
+	
+	<!-- 查询账单批次总数 -->
+	<select id="getBillconfListTotal" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(*) as count FROM t_bill_conf
+		<include refid="getBillconfCondition" />
+	</select>
+	
+	<!-- 查询账单批次列表 -->
+	<select id="getBillconfList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT billconfid, billconfname,createtime,modifytime FROM t_bill_conf
+		
+		<include refid="getBillconfCondition" />
+		
+		order by createtime desc
+ 		<if test="start != null and pagesize != null"> 
+ 			limit #{pagesize} offset #{start} 
+ 		</if>
+	</select>
+	
+	
+	<!-- 新增账单 -->	
+	<insert id="saveBill" parameterType="java.util.Map" useGeneratedKeys="true" keyProperty="billid" keyColumn="billid">
+		INSERT INTO t_bill( billconfid,theaterid,total_box_office,status,operatorid,sendtime,createtime,film_special_fund,vat,building_tax,education_surcharge,net_boxoffice,sub_account_ratio,sub_account_film,pay_film_side,income) 
+			VALUES 
+		(#{billconfid},#{theaterid},#{total_box_office},#{status},#{operatorid},#{sendtime},#{createtime},#{film_special_fund},#{vat},#{building_tax},#{education_surcharge},#{net_boxoffice},#{sub_account_ratio},#{sub_account_film},#{pay_film_side},#{income})
+	</insert>
+	
+	<!-- 更新账单 -->
+	<update id="updateBill" parameterType="java.util.Map">
+		UPDATE t_bill set modifytime = #{modifytime}
+		<if test="billconfid != null ">, billconfid = #{billconfid}</if>
+		<if test="theaterid != null ">, theaterid = #{theaterid}</if>
+		<if test="status != null ">, status = #{status}</if>
+		<if test="filename !=null">,filename=#{filename}</if>
+		<if test="operatorid != null ">, operatorid = #{operatorid}</if>
+		<where>
+			billid = #{billid}
+		</where>
+	</update>
+	
+	<!-- 删除账单-->
+	<delete id="removeBill" parameterType="java.util.Map">
+		DELETE FROM t_bill where billid=#{billid}
+	</delete>
+	
+	<sql id="getBillListCondition">
+		<where>
+			<if test="billconfid != null"> and tb.billconfid = #{billconfid} </if>
+			<if test="theatername != null"> and tt.theatername like #{theatername} </if>
+			<if test="theaternum != null"> and tt.theaternum like #{theaternum} </if>
+			<if test="theaterid != null">and tb.theaterid = #{theaterid}</if>
+			<if test="status != null">and tb.status=#{status}</if>
+			<if test="s_time!=null and s_time!='' and e_time!=null and e_time!=''"> and tb.sendtime between #{s_time} and #{e_time} </if>
+		</where>
+	</sql>
+	
+	<!-- 查询账单总数 -->
+	<select id="getBillListTotal" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(*) as count FROM t_bill tb
+		left join t_theater tt on tb.theaterid=tt.theaterid
+		<include refid="getBillListCondition" />
+	</select>
+	
+	<!-- 查询账单列表 -->
+	<select id="getBillList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT tb.billid,tb.filename,tb.status,tb.operatorid,tb.createtime,tt.theaternum,tt.theatername,tb.theaterid,tbc.billconfname FROM t_bill tb
+		LEFT JOIN t_theater tt ON tb.theaterid=tt.theaterid
+		LEFT JOIN t_bill_conf tbc ON tb.billconfid=tbc.billconfid
+		<include refid="getBillListCondition" />
+		order by tb.createtime desc
+ 		<if test="start != null and pagesize != null"> 
+ 			limit #{pagesize} offset #{start} 
+ 		</if>
+	</select>
+	
+	<!-- 根据billid集合批量查询查询物料列表 -->
+	<select id="queryBillListByIds" parameterType="java.util.List" resultType="java.util.Map">
+		SELECT tb.billid,tb.billconfid,tbc.billconfname,tb.theaterid,tt.theaternum,tt.theatername,tt.theatername,tu.userid FROM t_bill tb
+		join t_theater tt on tb.theaterid=tt.theaterid
+		left join t_bill_conf tbc on tbc.billconfid=tb.billconfid
+		left join t_userinfo  tu on tu.theaterid=tb.theaterid
+		left join t_role tr on tr.roleid=tu.roleid
+		WHERE tb.billid IN
+		<foreach item="item" collection="list" separator="," open="(" close=")">
+    			#{item}
+  		</foreach>
+  		and (tr.rolename like '%财务%' or tr.rolename like '%影院管理员%')
+	</select>
+	
+	<!-- 查询物料分发通知未收货列表 -->
+	<select id="queryMaterielStatusList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT ts.suppliesid,ts.suppliesconfid,ts.content,ts.theaterid,tt.theaternum,ts.status,ts.logistics,ts.waybill,ts.sendtime,ts.createtime,tt.theatername FROM t_supplies ts
+		left join t_theater tt on ts.theaterid=tt.theaterid
+		join t_supplies_conf tsc on ts.suppliesconfid=tsc.suppliesconfid
+		<where>
+			ts.status =1 and ts.status != 2
+			<if test="s_time!=null and s_time!='' and e_time!=null and e_time!=''"> and ts.sendtime between #{s_time} and #{e_time} </if>
+		</where>
+	</select>
+	
+	<!-- 批量添加账单 -->
+	<insert id="insertBillList" parameterType="java.util.List" useGeneratedKeys="true" keyColumn="billid" keyProperty="billid">
+		INSERT INTO t_bill( billconfid,theaterid,status,createtime,operatorid) 
+   			values
+		<foreach item="item" collection="list" separator=",">
+	   (#{item.billconfid},#{item.theaterid},#{item.status},#{item.createtime},#{item.operatorid})
+	    </foreach>
+	</insert>
+	
+	<!-- 批量删除账单 -->
+	<delete id="deleteBillList" parameterType="java.util.List" >
+		delete from t_bill where billid in 
+			<foreach collection="list" item="item" separator="," open="(" close=")" >
+				#{item}
+			</foreach>
+	</delete>
+	
+	<!-- 更新物料分发通知 -->
+	<update id="updateBillsByIds" parameterType="java.util.List">
+	
+		<foreach collection="list" item="item" separator=";">
+			UPDATE t_bill set modifytime = #{item.modifytime},status=1
+			<!-- <if test="suppliesconfid != null ">, suppliesconfid = #{suppliesconfid}</if>
+			<if test="theaterid != null ">, theaterid = #{theaterid}</if>
+			<if test="content != null ">, content = #{content}</if>
+			<if test="status != null ">, status = #{status}</if>
+			<if test="logistics != null ">, logistics = #{logistics}</if>
+			<if test="waybill != null ">, waybill = #{waybill}</if>
+			<if test="operatorid != null ">, operatorid = #{operatorid}</if>
+			<if test="sendtime != null ">, sendtime = #{sendtime}</if> -->
+			<where>
+				billid = #{item.billid}
+			</where>
+		</foreach>
+	</update>
+	
+	<select id="getUserid" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT  userid from t_userinfo tu
+		LEFT JOIN  t_theater tt on tu.theaterid=tt.theaterid
+		<where>
+			<if test="theaterids != null"> and tu.theaterid in (#{theaterids})</if>
+			<if test="roleids != null">and roleid in (#{roleids})</if>
+		</where>
+	</select>
+
+</mapper>

@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="user">
+	<!-- 查询所有用户详细信息 -->
+	<select id="getAllUser" resultType="java.util.Map" parameterType="java.util.Map">
+		SELECT * FROM t_userinfo
+		LIMIT #{offsetNum}, #{limitSize}
+	</select>
+	
+	<!-- 用户登录 -->
+	<select id="login" parameterType="java.lang.String" resultType="java.util.Map"> 
+		SELECT tu.*, tr.roletype, tr.status AS role_status FROM t_userinfo tu
+		JOIN t_role tr ON tu.roleid = tr.roleid 
+		WHERE tu.username = #{username}
+	</select>
+	
+	<!-- 用户登录时，更改用户的最后一次登录时间 -->
+	<select id="updateLastLoginTime" parameterType="java.lang.Integer">
+		UPDATE t_userinfo SET lastlogintime = NOW() WHERE userid = #{userid}
+	</select>
+	
+	<!-- 用户查看日志时，更改最后一次查看日志的时间为当前时间 -->
+	<select id="updateLastSeeLogTime" parameterType="java.lang.Integer">
+		UPDATE t_userinfo SET lastSeeLogTime = NOW() WHERE userid = #{userid}
+	</select>
+	
+	<!-- 根据ID查询某一用户的详细信息 -->
+	<select id="findUserById" parameterType="java.lang.String" resultType="java.util.Map"> 
+		SELECT * FROM t_userinfo WHERE userid = #{userid}
+	</select>
+	
+	<!-- 查询当前用户的角色类型及其所属影院(院线) -->
+	<select id="findRoleAndTheaterById" parameterType="java.lang.Integer" resultType="java.util.Map">
+		SELECT u.userid, u.username, u.roleid, u.theaterchainid, u.theaterid, r.roletype FROM t_userinfo u
+			JOIN t_role r ON u.roleid = r.roleid
+		WHERE userid = #{userid}
+	</select>
+	
+	<!-- 根据roletype查询用户 -->
+	<sql id="selectUserByRoleType">
+		SELECT tu.*, tr.roletype FROM t_userinfo tu
+		JOIN t_role tr ON tu.roleid = tr.roleid
+		<where>
+			<!-- roletype == 0 可以查询所有用户
+				 roletype == 1 可以查询院线和影院用户
+				 roletype == 2 只能查询当前影院用户	
+			 -->
+			<if test="roletype == 1">
+				AND tr.roletype != 0
+			</if>
+			<if test="roletype == 2">
+				AND tr.roletype = 2
+				AND tu.theaterid = #{theaterid}
+			</if>
+		</where>
+	</sql>
+	
+	<!-- 根据ids查询已审核用户列表，同时可以根据用户名进行模糊查询 -->
+	<select id="getAuditedUserListByStatus" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT u.*, r.roletype, r.rolename FROM
+		<!-- sql代码片段 -->
+		(<include refid="selectUserByRoleType"/>) AS u
+		JOIN t_role r ON u.roleid = r.roleid
+		WHERE u.audit_flag = 1
+		<if test="ids != null">
+			<foreach collection="ids" open="and u.userid in (" item="id" separator="," close=")">
+				#{id}
+			</foreach>
+		</if>
+		<if test="criteria != null">
+			AND u.username LIKE '%${criteria}%'
+		</if>
+		ORDER BY u.createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	<!-- 根据ids查询已审核用户 的数量(可以根据用户名进行模糊查询) -->
+	<select id="getAuditedUserListByStatusCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(*) FROM
+		<!-- sql代码片段 -->
+		(<include refid="selectUserByRoleType"/>) AS u
+		JOIN t_role r ON u.roleid = r.roleid
+		WHERE u.audit_flag = 1
+		<if test="ids != null">
+			<foreach collection="ids" open="and u.userid in (" item="id" separator="," close=")">
+				#{id}
+			</foreach>
+		</if>
+		<if test="criteria != null">
+			AND u.username LIKE '%${criteria}%'
+		</if>
+	</select>
+	
+	<!-- 查询未审核用户列表 -->
+	<select id="getUnAuditedUserList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT u.*, r.roletype, r.rolename FROM
+		<!-- sql代码片段 -->
+		(<include refid="selectUserByRoleType"/>) AS u
+		JOIN t_role r ON u.roleid = r.roleid
+		WHERE u.audit_flag = 0
+		<if test="criteria != null">
+			AND u.username LIKE '%${criteria}%'
+		</if>
+		ORDER BY u.createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	<!-- 查询未审核用户count -->
+	<select id="getUnAuditedUserListCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(*) FROM
+		<!-- sql代码片段 -->
+		(<include refid="selectUserByRoleType"/>) AS u
+		JOIN t_role r ON u.roleid = r.roleid
+		WHERE u.audit_flag = 0
+		<if test="criteria != null">
+			AND u.username LIKE '%${criteria}%'
+		</if>
+	</select>
+
+	<!-- 检查用户名/手机号码是否已被注册 -->
+	<select id="checkRepeat" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT username, mobile 
+		FROM t_userinfo 
+		WHERE username = #{username} 
+			OR mobile = #{mobile}
+	</select>
+	
+	<!-- 用户注册/添加用户 -->
+	<insert id="regist" parameterType="java.util.Map">
+		<selectKey keyProperty="userid" order="AFTER" resultType="java.lang.Integer">
+			SELECT LAST_INSERT_ID()
+		</selectKey>
+		<choose>
+			<!-- 影院用户 -->
+			<when test="theaterid != null">
+				<choose>
+					<!-- 添加用户时，有操作员id -->
+					<when test="operatorid != null">
+						INSERT INTO t_userinfo
+				            (username, `password`, realname, mobile, email, roleid, theaterid, operatorid)
+						VALUES (#{username}, #{password}, #{realname}, #{mobile}, #{email}, #{roleid}, #{theaterid}, #{operatorid})
+					</when>
+					<!-- 用户自己注册时，没有操作员id -->
+					<otherwise>
+						INSERT INTO t_userinfo
+				            (username, `password`, realname, mobile, email, roleid, theaterid)
+						VALUES (#{username}, #{password}, #{realname}, #{mobile}, #{email}, #{roleid}, #{theaterid})
+					</otherwise>
+				</choose>
+			</when>
+			<!-- 院线用户 -->
+			<when test="theaterchainid != null">
+				INSERT INTO t_userinfo
+		            (username, `password`, realname, mobile, email, roleid, theaterchainid, operatorid)
+				VALUES (#{username}, #{password}, #{realname}, #{mobile}, #{email}, #{roleid}, #{theaterchainid}, #{operatorid})
+			</when>
+			<!-- 系统用户 -->
+			<otherwise>
+				INSERT INTO t_userinfo
+		            (username, `password`, realname, mobile, email, roleid, operatorid)
+				VALUES (#{username}, #{password}, #{realname}, #{mobile}, #{email}, #{roleid}, #{operatorid})
+			</otherwise>
+		</choose>
+	</insert>
+	
+	<!-- 审核用户  -->
+	<update id="auditUser" parameterType="java.util.Map">
+		<choose>
+			<!-- 如果更改用户为"审核"状态，则需要为其赋角色 -->
+			<when test="audit_flag == 1">
+					UPDATE t_userinfo 
+						SET audit_flag = #{audit_flag},
+							roleid = #{roleid}
+					WHERE userid = #{userid}
+			</when>
+			<otherwise>
+					UPDATE t_userinfo 
+						SET audit_flag = #{audit_flag}
+					WHERE userid = #{userid}
+			</otherwise>
+		</choose>
+	</update>
+	
+	<!-- 创建用户并审核后更改用户isCreate为true/1 -->
+	<update id="updateIsCreate" parameterType="java.lang.Integer">
+		UPDATE t_userinfo 
+			SET isCreate = TRUE
+		WHERE userid = #{userid}
+	</update>
+	
+	<!-- 启用/禁用用户 -->
+	<update id="changeUserStatus" parameterType="java.util.Map">
+		UPDATE t_userinfo SET `status` = #{status}
+		WHERE userid = #{userid}
+	</update>
+	
+	<!-- 删除用户 -->
+	<delete id="deleteUser" parameterType="java.lang.Integer">
+		DELETE FROM t_userinfo 
+		WHERE userid = #{userid}
+	</delete>
+	
+	<!-- 更改用户信息(密码，邮箱) -->
+	<update id="updateUserInfo" parameterType="java.util.Map">
+		UPDATE t_userinfo SET email = #{email}, roleid = #{roleid}
+		WHERE userid = #{userid}
+	</update>
+	
+	<!-- 用户更改密码 -->
+	<update id="updatePassword" parameterType="java.util.Map">
+		UPDATE t_userinfo SET `password` = #{password}
+		WHERE userid = #{userid}
+	</update>
+	
+	<!-- 获取用户角色 -->
+	<select id="getRole" parameterType="java.lang.String" resultType="java.util.Map">
+		select tr.rolename,tr.roleid from t_userinfo tu left join t_role tr on tu.roleid=tr.roleid where tu.username=#{username}
+	</select>
+	
+	<!-- 根据角色id查询用户（查询角色关联的用户） -->
+	<select id="getUserListByRoleid" parameterType="java.lang.String" resultType="java.util.Map">
+		SELECT * FROM t_userinfo
+		WHERE roleid = #{roleid}
+	</select>
+	
+	<!-- 查询影院关联的用户 -->
+	<select id="findUserByTheaterid" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT * FROM t_userinfo
+		WHERE theaterid = #{theaterid}
+		ORDER BY createtime desc
+	</select>
+	
+	<!-- 获取用户权限 -->
+	<select id="getPermission" parameterType="java.lang.Integer" resultType="java.util.Map">
+		select tm.permission from rel_role_permission rrp LEFT JOIN t_menu tm on rrp.menuid=tm.menuid where rrp.roleid=#{roleid}
+	</select>
+
+	<!-- 根据影院id和角色id查询用户id -->
+	<select id="getUserid" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT  userid from t_userinfo tu
+		LEFT JOIN  t_theater tt on tu.theaterid=tt.theaterid
+		<where>
+			<if test="theaterids != null"> and tu.theaterid in
+				<foreach collection="theaterids" item="theaterids" separator="," open="(" close=")" >
+				#{theaterids}
+				</foreach>
+			</if>
+			<if test="roleids != null">and roleid in
+				<foreach collection="roleids" item="roleids" separator="," open="(" close=")" >
+				#{roleids}
+				</foreach>
+			</if>
+		</where>
+	</select>
+
+	<!-- 查询某角色下的可能正登陆用户 -->
+	<select id="findMabeyLoginUserList" parameterType="java.lang.String" resultType="java.util.Map">
+		SELECT tu.userid, tu.username FROM t_userinfo tu
+		LEFT OUTER JOIN t_role tr ON tu.roleid = tr.roleid
+		WHERE tu.status = 1 AND tu.audit_flag = 1 AND tr.status = 1
+		AND tu.roleid = #{roleid}
+	</select>
+
+
+	<select id="findUserByCriteria" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT u.*, r.roletype, r.rolename FROM
+		<!-- sql代码片段 -->
+		(<include refid="selectUserByRoleType"/>) AS u
+		JOIN t_role r ON u.roleid = r.roleid
+		<where>
+			<!-- 根据关注企业号状态查询 -->
+			<if test="ids != null">
+				<foreach collection="ids" open="and u.userid in (" item="id" separator="," close=")">
+					#{id}
+				</foreach>
+			</if>
+			<if test="criteria != null">
+				AND u.username LIKE '%${criteria}%'
+			</if>
+			<if test="sel_roletype != null">
+				AND u.roletype = #{sel_roletype}
+				<if test="sel_roletype == 2 and sel_theaterid != null">
+					AND u.theaterid = #{sel_theaterid}
+				</if>
+			</if>
+			<if test="mobile != null">
+				AND u.mobile = #{mobile}
+			</if>
+			<if test="audit_flag != null">
+				AND u.audit_flag = #{audit_flag}
+			</if>
+			<if test="status != null">
+				AND u.status = #{status}
+			</if>
+		</where>
+		ORDER BY u.createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+
+	<!-- 查询count -->
+	<select id="findUserByCriteriaCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(u.userid) FROM
+		<!-- sql代码片段 -->
+		(<include refid="selectUserByRoleType"/>) AS u
+		JOIN t_role r ON u.roleid = r.roleid
+		<where>
+			<!-- 根据关注企业号状态查询 -->
+			<if test="ids != null">
+				<foreach collection="ids" open="and u.userid in (" item="id" separator="," close=")">
+					#{id}
+				</foreach>
+			</if>
+			<if test="criteria != null">
+				AND u.username LIKE '%${criteria}%'
+			</if>
+			<if test="sel_roletype != null">
+				AND u.roletype = #{sel_roletype}
+				<if test="sel_roletype == 2 and sel_theaterid != null">
+					AND u.theaterid = #{sel_theaterid}
+				</if>
+			</if>
+			<if test="mobile != null">
+				AND u.mobile = #{mobile}
+			</if>
+			<if test="audit_flag != null">
+				AND u.audit_flag = #{audit_flag}
+			</if>
+			<if test="status != null">
+				AND u.status = #{status}
+			</if>
+		</where>
+	</select>
+	
+</mapper>

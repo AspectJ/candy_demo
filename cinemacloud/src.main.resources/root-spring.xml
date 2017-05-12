@@ -1,0 +1,223 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans.xsd 
+	 	http://www.springframework.org/schema/mvc
+	 	http://www.springframework.org/schema/mvc/spring-mvc.xsd  
+    	http://www.springframework.org/schema/context  
+       	http://www.springframework.org/schema/context/spring-context.xsd
+       	http://www.springframework.org/schema/aop
+		http://www.springframework.org/schema/aop/spring-aop.xsd
+
+		http://www.springframework.org/schema/tx 
+		http://www.springframework.org/schema/tx/spring-tx.xsd">
+	
+	<!-- 开启spring包扫描 -->
+	<context:component-scan base-package="com"/>
+	<!-- 开启spring特定注解 -->
+	<context:annotation-config/>
+	
+
+	<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ postgresql ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+		<!-- 基本属性 url、user、password -->
+		<property name="driverClassName" value="com.mysql.jdbc.Driver"></property>
+		<property name="url" value="jdbc:mysql://192.168.195.5:3306/xiaoxiang_theatre_db?useUnicode=true&amp;characterEncoding=UTF-8"></property>
+		<property name="username" value="root"></property>
+		<property name="password" value="123456"></property>
+		<!-- 配置初始化大小、最小、最大 -->
+		<property name="initialSize" value="1" />
+		<property name="minIdle" value="1" />
+		<property name="maxActive" value="20" />
+		<!-- 配置获取连接等待超时的时间 -->
+		<property name="maxWait" value="60000" />
+		<!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+		<property name="timeBetweenEvictionRunsMillis" value="60000" />
+		<!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+		<property name="minEvictableIdleTimeMillis" value="300000" />
+		<property name="validationQuery" value="SELECT 1" />
+		<property name="testWhileIdle" value="true" />
+		<property name="testOnBorrow" value="false" />
+		<property name="testOnReturn" value="false" />
+		<!-- 打开PSCache，并且指定每个连接上PSCache的大小 -->
+		<property name="poolPreparedStatements" value="true" />
+		<property name="maxPoolPreparedStatementPerConnectionSize" value="20" />
+		<!-- 配置监控统计拦截的filters -->
+		<property name="filters" value="wall,stat" />
+
+		<!-- 超过时间限制是否回收 -->
+		<property name="removeAbandoned" value="true" />
+		<!-- 超时时间；单位为秒。180秒=3分钟 -->
+		<property name="removeAbandonedTimeout" value="180" />
+		<!-- 关闭abanded连接时输出错误日志 -->
+		<property name="logAbandoned" value="true" />
+	</bean>
+
+
+	<!-- spring ioc容器创建MyBatis框架中的SqlSessionFactory -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="configLocation" value="classpath:mybatis-config.xml" />
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+	<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ postgresql ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+	
+	
+	
+	<!-- ========================== spring 事务管理 start ======================= -->
+	
+	<!-- 事务管理器 -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource"/>
+	</bean>
+	
+	<!-- 定义一个增强 -->
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<!-- 配置回滚异常类型为Exception -->
+			<tx:method name="add*"    rollback-for="java.lang.Exception"/>
+			<tx:method name="delete*" rollback-for="java.lang.Exception"/>
+			<tx:method name="update*" rollback-for="java.lang.Exception"/>
+			<tx:method name="audit*"  rollback-for="java.lang.Exception"/>
+			<tx:method name="regist*" rollback-for="java.lang.Exception"/>
+			<tx:method name="authorize*" rollback-for="java.lang.Exception"/>
+			<tx:method name="confirm*" rollback-for="java.lang.Exception"/>
+		</tx:attributes>
+	</tx:advice>
+	
+	<!-- aop配置定义切面和切点的信息 -->
+	<aop:config proxy-target-class="true">
+		<!-- 定义切点:哪些类应用增强 -->
+		<aop:pointcut expression="execution(* com..*(..))" id="myPoint"/>
+		<!-- 定义切面: -->
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="myPoint"/>
+	</aop:config>
+	
+	<aop:aspectj-autoproxy proxy-target-class="true"/>
+	
+	<!-- ========================== spring事务管理 end ======================= -->
+	
+
+
+	<bean id="jedisPoolConfig" class="redis.clients.jedis.JedisPoolConfig">
+		<!-- 控制一个pool可分配多少个jedis实例 -->
+		<!-- <property name="maxTotal" value="20" /> -->
+		<!-- 控制一个pool最多有多少个状态为idle(空闲)的jedis实例 -->
+		<property name="maxIdle" value="5" />
+		<property name="minIdle" value="1" />
+		<!-- 表示当borrow一个jedis实例时，最大的等待时间，如果超过等待时间，则直接抛出JedisConnectionException -->
+		<property name="maxWaitMillis" value="5000" />
+		<!-- 在borrow一个jedis实例时，是否提前进行validate操作；如果为true，则得到的jedis实例均是可用的 -->
+		<property name="testOnBorrow" value="true" />
+		<property name="testOnReturn" value="true" />
+		<property name="testWhileIdle" value="true" />
+	</bean>
+
+	<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Jedis ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+	<!-- Jedis ConnectionFactory 数据库连接配置 -->
+	<bean id="jedisConnectionFactory" class="org.springframework.data.redis.connection.jedis.JedisConnectionFactory">
+		<property name="hostName" value="192.168.195.5" />
+		<property name="port" value="6379" />
+		<property name="password" value="" />
+		<property name="poolConfig" ref="jedisPoolConfig" />
+	</bean>
+
+	<bean id="stringSerializer" class="org.springframework.data.redis.serializer.StringRedisSerializer" />
+	<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Jedis ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+	
+	 <!-- ============================================ Quartz start =========================================-->
+     <bean name="setAccessTokenJobDetail"    class="org.springframework.scheduling.quartz.JobDetailFactoryBean">  
+        <property name="jobClass" value="com.wx.SetAccessTokenJob" />  
+        <property name="durability" value="true" />  
+    </bean>
+    
+    <bean name="messagePushJobDetail"    class="org.springframework.scheduling.quartz.JobDetailFactoryBean">  
+        <property name="jobClass" value="com.rest.materiel.MessagePushAuto" />  
+        <property name="durability" value="true" />  
+    </bean>
+    
+  <!--  <bean name="ffersMessagePushJobDetail"    class="org.springframework.scheduling.quartz.JobDetailFactoryBean">  
+        <property name="jobClass" value="com.rest.ffers.FfersMessagePushAuto" />  
+        <property name="jobDataMap">  
+        <map>  
+            <entry key="userRedis" value-ref="userRedis" /> 
+            <entry key="materielDao" value-ref="materielDao" /> 
+            <entry key="wxTools" value-ref="wxTools"/>
+        </map>  
+    </property>
+        <property name="durability" value="true" />  
+    </bean> -->
+    
+
+    <!-- ======================== 调度触发器 ======================== -->  
+	<bean id="cronTrigger"  class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">  
+        <property name="jobDetail" ref="messagePushJobDetail" />
+     <!--   <property name="startDelay" value="10000" /> -->
+        <property name="cronExpression" value="0 15 16 ? * *" />  
+          
+    </bean>
+    
+    <bean id="simpleTrigger"  class="org.springframework.scheduling.quartz.SimpleTriggerFactoryBean">  
+        <property name="jobDetail" ref="setAccessTokenJobDetail" />  
+        <!-- 延时 40S启动-->
+        <!-- <property name="startDelay" value="40000" /> -->
+        <!-- 每1小时50分执行一次 -->
+       <property name="repeatInterval" value="6600000" />
+    </bean>  
+	  
+	<!-- ======================== 调度工厂 ======================== -->  
+	<bean id="jobFactory" class="com.wx.JobFactory"></bean>  
+	<bean  class="org.springframework.scheduling.quartz.SchedulerFactoryBean">  
+		<property name="dataSource" ref="dataSource" />
+		<property name="jobFactory" ref="jobFactory" />
+		<property name="quartzProperties">
+			<props>
+				<prop key="org.quartz.scheduler.instanceName">CRMscheduler</prop>
+				<prop key="org.quartz.scheduler.instanceId">AUTO</prop>
+				<!-- 线程池配置 -->
+				<prop key="org.quartz.threadPool.class">org.quartz.simpl.SimpleThreadPool</prop>
+				<prop key="org.quartz.threadPool.threadCount">20</prop>
+				<prop key="org.quartz.threadPool.threadPriority">5</prop>
+				<!-- JobStore配置 -->
+				<prop key="org.quartz.jobStore.class">org.quartz.impl.jdbcjobstore.JobStoreTX</prop>
+				<!-- 集群配置 -->
+				<!-- 通知Scheduler实例参与到一个集群当中 -->
+				<prop key="org.quartz.jobStore.isClustered">true</prop>
+				<!-- Scheduler实例检入到数据库中的频率，单位：毫秒 -->
+				<prop key="org.quartz.jobStore.clusterCheckinInterval">15000</prop>
+				<prop key="org.quartz.jobStore.maxMisfiresToHandleAtATime">1</prop>
+				<prop key="org.quartz.jobStore.misfireThreshold">120000</prop>
+				<prop key="org.quartz.jobStore.tablePrefix">QRTZ_</prop>
+			</props>
+		</property>
+		<property name="schedulerName" value="CRMscheduler" />
+		<!-- QuartzScheduler延时启动 -->
+		<property name="startupDelay" value="30" />
+		<property name="applicationContextSchedulerContextKey" value="applicationContext" />
+		<property name="overwriteExistingJobs" value="true" />
+		<!-- 设置自启动 -->
+		<property name="autoStartup" value="true" />
+        <property name="jobDetails">  
+            <list>  
+                <ref bean="setAccessTokenJobDetail" />
+              <ref bean="messagePushJobDetail" />
+            </list>  
+        </property>  
+        <property name="triggers">  
+            <list>  
+                <ref bean="simpleTrigger" />
+              <ref bean="cronTrigger" />
+            </list>  
+        </property>  
+    </bean>
+    <!-- ============================================ Quartz end =========================================-->
+
+	<!-- 引入shiro配置文件 -->
+	<import resource="classpath:applicationContext-shiro.xml"/>
+
+</beans>

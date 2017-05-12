@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="zone">
+
+	<!-- 查询省份 -->
+	<select id="findProvince" resultType="java.util.Map">
+		SELECT * FROM dq_province
+	</select>
+	
+	<!-- 根据省份查询市级单位 -->
+	<select id="findCity" parameterType="java.lang.Integer" resultType="java.util.Map">
+		SELECT * FROM dq_city
+		WHERE fatherID = #{provinceID}
+	</select>
+	
+	<!-- 根据市级查询县级单位 -->
+	<select id="findArea" parameterType="java.lang.Integer" resultType="java.util.Map">
+		SELECT * FROM dq_area
+		WHERE fatherID = #{cityID}
+	</select>
+</mapper>

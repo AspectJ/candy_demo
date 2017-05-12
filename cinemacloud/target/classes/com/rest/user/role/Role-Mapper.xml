@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="role">
+		
+	<!-- 添加角色信息 -->
+	<insert id="addRole" parameterType="java.util.Map">
+		<selectKey order="AFTER" keyProperty="roleid" resultType="java.lang.Integer">
+			SELECT LAST_INSERT_ID()
+		</selectKey>
+		INSERT INTO t_role(rolename, roletype) VALUES(#{rolename}, #{roletype})
+	</insert>
+	
+	<!-- 更改角色状态 -->
+	<update id="auditRoleStatus" parameterType="java.util.Map">
+		UPDATE t_role 
+				SET `STATUS` = #{status}
+		WHERE roleid = #{roleid}
+	</update>
+	
+	<!-- 根据角色类型和院线(影院)查询拥有角色信息 -->
+	<select id="findRolenameBySystem" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT * FROM t_role
+		WHERE roletype = #{roletype}
+			AND rolename != '未审核用户'
+		ORDER BY roleid DESC 
+	</select>
+	
+	<!-- =================SQL片段 BEGIN================= -->
+		<!-- 查询当前用户所能看到的所有角色列表 -->
+		<sql id="findAvailableRoleList">
+			SELECT * FROM t_role tr
+			WHERE tr.rolename != '未审核用户'
+			<!-- 当前用户时系统角色，可以查询所有角色 -->
+			<if test="user_roletype == 0">
+			</if>
+			<!-- 当前用户时院线角色， 可以查询院线和影院的所有角色，不能查询系统角色 -->
+			<if test="user_roletype == 1">
+				AND tr.roletype != 0
+			</if>
+			<!-- 当前用户时影院角色， 只能查看自己所属影院的全部角色 -->
+			<if test="user_roletype == 2">
+				AND tr.roletype = 2
+			</if>
+		</sql>
+	<!-- =================SQL片段 END ================= -->
+	
+	<!-- 角色权限映射resultMap -->
+	<resultMap type="com.cp.bean.Role" id="roleAndMenuResultMap">
+		<id column="roleid" property="roleid"/>
+		<result column="rolename" property="rolename"/>
+		<result column="rolename" property="rolename"/>
+		<result column="roletype" property="roletype"/>
+		
+		<result column="status" property="status"/>
+		<result column="theaterid" property="theaterid"/>
+		<result column="theaterchainid" property="theaterchainid"/>
+		
+		<!-- 角色(t_role)和角色权限表(rel_role_permission) 一对多映射 -->
+		<collection property="menuList" ofType="com.cp.bean.Role_Menu">
+			<id column="pid" property="pid"/>
+			<result column="menuid" property="menuid"/>
+			
+			<!-- 角色权限表(rel_role_permission)和权限表(t_menu) 一对一映射 -->
+			<association property="menu" javaType="com.cp.bean.Menu">
+				<id column="menuid" property="menuid"/>
+				<result column="menuname" property="menuname"/>
+				<result column="parentid" property="parentid"/>
+				<result column="permission" property="permission"/>
+			</association>
+		</collection>
+	</resultMap>
+	
+	<!-- 角色roleResultMap -->
+	<resultMap type="com.cp.bean.Role" id="roleResultMap">
+		<id column="roleid" property="roleid"/>
+		<result column="rolename" property="rolename"/>
+		<result column="rolename" property="rolename"/>
+		<result column="roletype" property="roletype"/>
+		
+		<result column="status" property="status"/>
+		<result column="theaterid" property="theaterid"/>
+		<result column="theaterchainid" property="theaterchainid"/>
+	</resultMap>
+	
+	<!-- 查询角色信息列表(可根据角色名模糊查询) -->
+	<select id="findRoleListByCriteria" parameterType="java.util.Map" resultMap="roleResultMap">
+		SELECT r.*
+		<!-- 引用SQL代码片段 -->
+		FROM (<include refid="findAvailableRoleList"/>) AS r
+		<where>
+			<if test="sel_roletype != null">
+				AND r.roletype = #{sel_roletype}
+			</if>
+			<if test="sel_criteria != null">
+				AND r.rolename LIKE '%${sel_criteria}%'
+			</if>
+		</where>
+		ORDER BY r.roleid DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	
+	<!-- 查询角色信息总数count -->
+	<select id="findRoleListByCriteriaCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(*)
+		<!-- 引用SQL代码片段 -->
+		FROM (<include refid="findAvailableRoleList"/>) AS r
+		<where>
+			<if test="sel_roletype != null">
+				AND r.roletype = #{sel_roletype}
+			</if>
+			<if test="sel_criteria != null">
+				AND r.rolename LIKE '%${sel_criteria}%'
+			</if>
+		</where>
+	</select>
+	
+	<!-- 根据roleid查询角色 -->
+	<select id="findRoleInfoById" parameterType="java.lang.Integer" resultType="java.util.Map">
+		SELECT * FROM t_role
+		WHERE roleid = #{roleid}
+	</select>
+	
+	<!-- 更改角色信息(角色名) -->
+	<update id="updateRoleInfo" parameterType="java.util.Map">
+		UPDATE t_role SET rolename = #{rolename}
+		WHERE roleid = #{roleid}
+	</update>
+	
+	<!-- 为角色添加权限 -->
+	<insert id="addPermission" parameterType="java.util.Map">
+		INSERT rel_role_permission(roleid, menuid) VALUES
+		<foreach collection="menuIdlist" item="menuid" separator=",">
+			(#{roleid}, #{menuid})
+		</foreach>
+	</insert>
+	
+	<!-- 删除角色信息 -->
+	<delete id="deleteRole" parameterType="java.lang.String">
+		DELETE FROM t_role
+		WHERE roleid = #{roleid}
+	</delete>
+	
+	<!-- 根据roleid查询角色及其权限信息 -->
+	<select id="findRoleByRoleid" parameterType="java.lang.Integer" resultMap="roleAndMenuResultMap">
+		SELECT r.*, rrp.pid, rrp.menuid, tm.menuname, tm.parentid, tm.permission
+		FROM t_role r
+		LEFT OUTER JOIN rel_role_permission rrp ON r.roleid = rrp.roleid
+		LEFT OUTER JOIN t_menu tm ON tm.menuid = rrp.menuid
+		WHERE r.roleid = #{roleid}
+	</select>
+	
+	
+	<!-- 重复性校验(rolename校验，不能重复) -->
+	<select id="checkRepeat" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(*) FROM t_role
+		WHERE roletype = #{roletype} AND rolename = #{rolename}
+	</select>
+	
+	
+	<!-- ================================ 影院角色"未审核用户" BEGIN ======================================= -->
+	<!-- 查询影院角色的"未审核用户"详细信息 -->
+	<select id="getUnAuditRoleInfo" resultType="java.util.Map">
+		SELECT * FROM t_role
+		WHERE rolename = "未审核用户"
+	</select>
+	
+	<!-- 如果影院角色没有"未审核用户"，则创建该角色
+	 	 		rolename = "未审核用户"  roletype = 2	status = 1
+	 -->
+	 <insert id="addUnAuditRole" parameterType="java.util.Map">
+	 	<selectKey keyProperty="roleid" resultType="java.lang.Integer" order="AFTER">
+	 		SELECT LAST_INSERT_ID()
+	 	</selectKey>
+	 	INSERT INTO t_role(rolename, roletype, `status`) 
+	 		VALUES(#{rolename}, #{roletype}, #{status})
+	 </insert>
+	 <!-- ================================  影院角色"未审核用户" END  ======================================= -->
+	
+</mapper>

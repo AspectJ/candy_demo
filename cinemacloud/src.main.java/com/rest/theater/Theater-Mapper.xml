@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="theater">
+	
+	<select id="findTheaterChainList" resultType="java.util.Map">
+		SELECT * FROM t_theaterchain
+		<if test="roletype == 1 and theaterchainid != null">
+			WHERE theaterchainid = #{theaterchainid}
+		</if>
+	</select>
+	
+	<!-- 添加影院信息 -->
+	<insert id="addTheater" parameterType="java.util.Map">
+		<selectKey keyProperty="theaterid" order="AFTER" resultType="java.lang.Integer">
+			SELECT LAST_INSERT_ID()
+		</selectKey>
+		<choose>
+			<when test="description != null">
+				INSERT INTO t_theater(theaternum, theatername, theaterphone, theateraddress, description, createtime)
+					VALUES(#{theaternum}, #{theatername}, #{theaterphone}, #{theateraddress}, #{description}, NOW())
+			</when>
+			<otherwise>
+				INSERT INTO t_theater(theaternum, theatername, theaterphone, theateraddress, createtime)
+					VALUES(#{theaternum}, #{theatername}, #{theaterphone}, #{theateraddress}, NOW())
+			</otherwise>
+		</choose>
+	</insert>
+	
+	<!-- 添加影院的归档属性 -->
+	<insert id="addArchive" parameterType="java.util.Map">
+		INSERT INTO rel_theater_archive(theaterid, archiveid, `value`, content) 
+		VALUES
+			<foreach collection="jsonArray" item="archiveMap" separator=",">
+				(
+					#{theaterid}, 
+					#{archiveMap.archiveid}, 
+					#{archiveMap.archive_value}, 
+					#{archiveMap.archive_content}
+				)
+			</foreach>
+	</insert>
+	
+	<!-- 更新影院信息 -->
+	<update id="updateTheater" parameterType="java.util.Map">
+		<choose>
+			<when test="description != null">
+				UPDATE t_theater SET theaternum = #{theaternum},
+								theatername = #{theatername},
+								theaterphone = #{theaterphone},
+								theateraddress = #{theateraddress}, 
+								description = #{description},
+								modifytime = NOW()
+				WHERE theaterid = #{theaterid}
+			</when>
+			<otherwise>
+				UPDATE t_theater SET theaternum = #{theaternum},
+								theatername = #{theatername},
+								theaterphone = #{theaterphone},
+								theateraddress = #{theateraddress}, 
+								modifytime = NOW()
+				WHERE theaterid = #{theaterid}
+			</otherwise>
+		</choose>
+	</update> 
+	
+	<!-- 删除影院的归档属性 -->
+	<delete id="deleteArchive" parameterType="java.util.Map">
+		DELETE FROM rel_theater_archive 
+		WHERE theaterid = #{theaterid}
+	</delete>
+	
+	<!-- 删除影院信息 -->
+	<delete id="deleteTheater" parameterType="java.util.Map">
+		DELETE FROM t_theater 
+		WHERE theaterid = #{theaterid}
+	</delete>
+	
+	<!-- 获取所有影院详细信息 -->
+	<select id="findAllTheater" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT * FROM t_theater
+		<where>
+			<if test="criteria != null">
+				AND theatername LIKE '%${criteria}%'
+			</if>
+			<if test="theaterid != null">
+				AND theaterid = #{theaterid}
+			</if>
+		</where>
+		ORDER BY createtime DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	<!-- 获取所有影院总数(可根据影院名进行模糊查询) -->
+	<select id="findAllTheaterCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(*) FROM t_theater
+		<where>
+			<if test="criteria != null">
+				AND theatername LIKE '%${criteria}%'
+			</if>
+			<if test="theaterid != null">
+				AND theaterid = #{theaterid}
+			</if>
+		</where>
+	</select>
+	
+	<!-- 查找所有影院，用于注册 -->
+	<select id="findTheaterListForRegist" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT theaterid, theaternum, theatername FROM t_theater
+		<if test="criteria != null">
+			WHERE theatername LIKE '%${criteria}%'
+		</if>
+		ORDER BY createtime DESC
+	</select>
+	
+	<!-- 查询能够查看的院线的简易信息(theaterid， theatername) -->
+	<select id="findTheaterSimpleInfoList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT theaterid, theatername FROM t_theater
+		<where>
+			<if test="criteria != null">
+				AND theatername LIKE '%${criteria}%'
+			</if>
+			<if test="theaterid != null">
+				AND theaterid = #{theaterid}
+			</if>
+		</where>
+		ORDER BY createtime DESC
+	</select>
+	
+	<!-- 根据影院编码查询影院详细信息 -->
+	<select id="findTheaterByNum" parameterType="java.lang.String" resultType="java.util.Map">
+		SELECT * FROM t_theater WHERE theaternum = #{theaternum}
+	</select>
+	
+	<!-- 根据影院ID查询影院详细信息 -->
+	<select id="findTheaterById" parameterType="java.lang.Integer" resultType="java.util.Map">
+		SELECT * FROM t_theater WHERE theaterid = #{theaterid}
+	</select>
+	
+	<!-- 根据id查询院线详细信息 -->
+	<select id="findTheaterChainById" parameterType="java.lang.Integer" resultType="java.util.Map">
+		SELECT * FROM t_theaterchain
+		WHERE theaterchainid = #{theaterchainid}
+	</select>
+	
+	<!-- 验证影院的重复性(影院名称和影院编码唯一) -->
+	<select id="checkTheaterRepeat" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT * FROM t_theater
+		WHERE
+		<if test="theaterid != null">
+			theaterid != #{theaterid} AND 
+		</if>
+		(theaternum = #{theaternum} OR theatername = #{theatername})
+	</select>
+	
+	<!-- 根据影院id查询该影院归档属性信息 -->
+	<select id="findArchiveListByTheaterid" parameterType="java.lang.Integer" resultType="java.util.Map">
+		SELECT id, theaterid, archiveid, `value` archive_value, content archive_content
+		FROM rel_theater_archive
+		WHERE theaterid = #{theaterid}
+	</select>
+	
+	<!-- 根据userid查询该用户所属影院 -->
+	<select id="findTheaterByUserid" parameterType="java.lang.String" resultType="java.util.Map">
+		SELECT userid, theaterid, lastlogintime FROM t_userinfo
+		WHERE  userid = #{userid}
+	</select>
+	
+	<!-- 根据theaterid查询该影院关联角色 -->
+	<select id="findRoleByTheaterid" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT r.* FROM t_role r
+		JOIN t_theater t ON r.theaterid = t.theaterid
+		WHERE t.theaterid = #{theaterid}
+	</select>
+
+	<!-- 影院归档及其影院resultMap -->
+	<resultMap id="theaterArchiveAndTheaterResultMap" type="com.cp.bean.TheaterArchiveCustom">
+		<result column="value" property="value"/>
+		<result column="content" property="content"/>
+
+		<collection property="theaterList" ofType="com.cp.bean.Theater">
+			<id column="theaterid" property="theaterid"/>
+			<result column="theatername" property="theatername"/>
+		</collection>
+	</resultMap>
+	
+	<!-- 查询当前用户能够有权限查看的影院ID，名称及其城市类别 -->
+	<select id="findTheaterByCityLevel" parameterType="java.util.Map" resultMap="theaterArchiveAndTheaterResultMap">
+		SELECT rta.id, rta.value, rta.content, tt.theaterid, tt.theatername
+		FROM rel_theater_archive rta
+		LEFT OUTER JOIN t_theater tt ON rta.theaterid = tt.theaterid
+		<if test="theaterid != null">
+			WHERE tt.theaterid = #{theaterid}
+		</if>
+	</select>
+
+	<!-- 根据影院名称查询影院id -->
+	<select id="findTheaterByName" parameterType="java.lang.String" resultType="java.util.Map">
+
+		SELECT theaterid FROM t_theater WHERE theatername=#{theatername}
+	</select>
+
+
+</mapper>
+

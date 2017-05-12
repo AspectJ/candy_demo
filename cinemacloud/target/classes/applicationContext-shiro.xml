@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+     	http://www.springframework.org/schema/beans/spring-beans.xsd 
+    	http://www.springframework.org/schema/context  
+       	http://www.springframework.org/schema/context/spring-context.xsd
+       	http://www.springframework.org/schema/aop
+		http://www.springframework.org/schema/aop/spring-aop.xsd
+		http://www.springframework.org/schema/tx 
+		http://www.springframework.org/schema/tx/spring-tx.xsd">
+	
+	
+    <!--  
+    1. 配置 SecurityManager!
+    --> 
+    
+    <bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+    	<property name="sessionManager" ref="defaultWebSessionManager"/>
+        <property name="cacheManager" ref="cacheManager"/>
+        <!-- Single realm app.  If you have multiple realms, use the 'realms' property instead. -->
+		<property name="authenticator" ref="authenticator"/>
+        <property name="rememberMeManager" ref="rememberMeManager"/>
+        <property name="realms">
+            <list>
+                <ref bean="shiroRealm" />
+                <ref bean="weiXinRealm" />
+            </list>
+        </property>
+    </bean>
+    
+    
+    <!-- 配置sessionManager -->
+    <bean id="defaultWebSessionManager" class="org.apache.shiro.web.session.mgt.DefaultWebSessionManager">
+    	<!-- 设置全局会话超时时间，默认30分钟(1800000)   -->
+        <property name="globalSessionTimeout" value="1800000" />  
+        <!-- 是否在会话过期后会调用SessionDAO的delete方法删除会话 默认true   -->
+        <property name="deleteInvalidSessions" value="true" />  
+  
+        <!-- 会话验证器调度时间   -->
+        <property name="sessionValidationInterval" value="1800000" />  
+  
+        <!-- session存储的实现   -->
+        <property name="sessionDAO" ref="redisShiroSessionDAO" />  
+        <!-- sessionIdCookie的实现,用于重写覆盖容器默认的JSESSIONID   -->
+        <property name="sessionIdCookie" ref="sharesession" />  
+
+        <!-- 定时检查失效的session   -->
+        <property name="sessionValidationSchedulerEnabled" value="true" /> 
+        
+        <!-- 是否启用/禁用Session Id Cookie，默认是启用的；如果禁用后将不会设置Session Id Cookie，
+        	  即默认使用了Servlet容器的JSESSIONID，
+        	  且通过URL重写（URL中的“;JSESSIONID=id”部分）保存Session Id。 
+       	--> 
+        <property name="sessionIdCookieEnabled" value="true"/> 
+        <property name="sessionIdUrlRewritingEnabled" value="false" />
+    </bean>
+    
+    
+	<!-- redisSessionDao -->
+    <bean id="redisShiroSessionDAO" class="com.cp.shiro.sessiondao.RedisSessionDao"/>
+    
+    
+	<!-- sessionIdCookie的实现,用于重写覆盖容器默认的JSESSIONID -->  
+    <bean id="sharesession" class="org.apache.shiro.web.servlet.SimpleCookie">  
+        <!-- cookie的name,对应的默认是 JSESSIONID   -->
+        <constructor-arg name="name" value="SHAREJSESSIONID" />  
+        <!-- jsessionId的path为 / 用于多个系统共享jsessionId   -->
+        <property name="path" value="/" />  
+        <property name="httpOnly" value="true"/>  
+    </bean>
+    
+    <!-- 自定义redisManager-redis -->
+    <bean id="cacheManager" class="com.cp.shiro.cache.RedisCacheManager">
+        <property name="redisManager" ref="redisManager" />
+        <property name="keyPrefix" value="cinemacloud:shiro_cache:"/>
+    </bean>
+
+    <bean id="redisManager" class="org.crazycake.shiro.RedisManager">
+        <property name="host" value="192.168.195.5"/>
+        <property name="port" value="6379"/>
+        <property name="expire" value="1800"/>
+        <property name="password" value=""/>
+    </bean>
+
+        <!-- 多realm配置 -->
+	<bean id="authenticator" class="org.apache.shiro.authc.pam.ModularRealmAuthenticator">
+		<!-- shiro 认证策略 -->
+		<property name="authenticationStrategy">
+			<bean class="org.apache.shiro.authc.pam.AtLeastOneSuccessfulStrategy"/>
+		</property>
+	</bean>
+
+    <!-- 
+    	3. 配置 Realm 
+    	3.1 直接配置实现了 org.apache.shiro.realm.Realm 接口的 bean
+    -->
+    <bean id="shiroRealm" class="com.cp.shiro.realms.ShiroRealm">
+    	<property name="credentialsMatcher">
+    		<bean class="org.apache.shiro.authc.credential.HashedCredentialsMatcher">
+    			<property name="hashAlgorithmName" value="MD5"/>
+    			<property name="hashIterations" value="1024"/>
+    		</bean>
+    	</property>
+    </bean>
+
+    <bean id="weiXinRealm" class="com.cp.shiro.realms.WeiXinRealm" />
+
+
+
+
+	<!--  
+    4. 配置 LifecycleBeanPostProcessor. 可以自定的来调用配置在 Spring IOC 容器中 shiro bean 的生命周期方法. 
+    -->   
+    <bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor"/>
+
+    <!--  
+    5. 启用 IOC 容器中使用 shiro 的注解. 但必须在配置了 LifecycleBeanPostProcessor 之后才可以使用. 
+    -->  
+    <bean class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator"
+          depends-on="lifecycleBeanPostProcessor">
+        <!-- 配置为CGlib动态代理 -->
+    	<property name="proxyTargetClass" value="true"/>
+	</bean>
+    <bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">
+        <property name="securityManager" ref="securityManager"/>
+    </bean>
+
+
+   	<!--  
+    6. 配置 ShiroFilter. 
+    6.1 id 必须和 web.xml 文件中配置的 DelegatingFilterProxy 的 <filter-name> 一致.
+                      若不一致, 则会抛出: NoSuchBeanDefinitionException. 因为 Shiro 会来 IOC 容器中查找和 <filter-name> 名字对应的 filter bean.
+    -->   
+    <bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+        <property name="securityManager" ref="securityManager"/>
+        <property name="loginUrl" value="/Login"/>
+<!--         <property name="successUrl" value="/success.jsp"/>
+        <property name="unauthorizedUrl" value="/unauthorized.jsp"/> -->
+        
+<!--         <property name="filterChainDefinitions">
+            <value>
+                /login.jsp = anon
+                /rest/user/login = anon
+                /rest/user/getAllUser = anon
+                /logOut = logout
+                
+                # everything else requires authentication:
+                /** = authc
+            </value>
+        </property> -->
+        <property name="filterChainDefinitionMap" ref="filterChainDefinitionMap"/>
+    </bean>
+    
+    <!-- 实例工厂类 -->
+    <bean id="filterChainDefinitionMap" 
+    		factory-bean="filterChainDefinitionMapBuilder" factory-method="buildFilterChainDefinitionMap"/>
+    
+    <bean id="filterChainDefinitionMapBuilder" class="com.cp.shiro.factory.FilterChainDefinitionMapBuilder"/>
+
+
+
+
+
+    <!-- 配置RemberMeCookie -->
+    <bean id="rememberMeCookie" class="org.apache.shiro.web.servlet.SimpleCookie">
+        <constructor-arg value="rememberMe"/>
+        <property name="httpOnly" value="true"/>
+        <!-- 30天 -->
+        <property name="maxAge" value="2592000"/>
+    </bean>
+
+    <!-- 配置RememberMe管理器 -->
+    <bean id="rememberMeManager" class="org.apache.shiro.web.mgt.CookieRememberMeManager">
+        <property name="cipherKey" value="#{T(org.apache.shiro.codec.Base64).decode('4AvVhmFLUs0KTA3Kprsdag==')}"/>
+        <property name="cookie" ref="rememberMeCookie"/>
+    </bean>
+    
+</beans>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="log">
+	
+	<!-- 添加日志记录 -->
+	<insert id="addLogInfo" parameterType="com.cp.bean.LogInfo">
+		INSERT INTO t_log(USERID, METHOD_NAME, METHOD_DESCRIPTION, REQUEST_IP,
+							REQUEST_URI,CREATE_TIME)
+		VALUES(
+						#{USERID}, #{METHOD_NAME}, #{METHOD_DESCRIPTION}, #{REQUEST_IP},
+						#{REQUEST_URI}, #{CREATE_TIME}
+		)
+	</insert>
+	
+	
+	<!-- sql代码片段  如果是影院用户，则只能查看自己所属影院的日志信息 -->
+	<sql id="infoFragment">
+		SELECT * FROM t_log
+		<!-- 院线用户不能查看系统用户的操作日志 -->
+		<if test="roletype == 1">
+			WHERE userid IN (	
+								SELECT DISTINCT userid FROM t_userinfo tu 
+								JOIN t_role tr ON tu.roleid = tr.roleid
+								WHERE roletype != 0
+							)
+		</if>
+		<!-- 影院用户只能查看自己所属影院的操作日志 -->
+		<if test="roletype == 2 and theaterid != null">
+			WHERE userid IN (	
+								SELECT DISTINCT userid FROM t_userinfo
+								WHERE theaterid = #{theaterid}
+							)
+		</if>
+	</sql>
+	
+	<!-- 查看最新日志或者全部日志 -->
+	<select id="getLogList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT tl.*
+		FROM (<include refid="infoFragment"/>) AS tl
+		<where>
+			<!-- isNew=1表示查看最新日志 -->
+			<if test="isNew != null and isNew == 1">
+				AND  tl.CREATE_TIME > 	(
+										SELECT lastSeeLogTime 
+										FROM t_userinfo
+										WHERE userid = #{userid}
+									)
+			</if>
+		</where>
+		ORDER BY tl.CREATE_TIME DESC
+		<if test="offsetNum != null and limitSize != null">
+			LIMIT #{offsetNum}, #{limitSize}
+		</if>
+	</select>
+	
+	
+	<!-- 查看最新日志或者全部日志的count -->
+	<select id="getLogListCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(*) 
+		FROM (<include refid="infoFragment"/>) AS tl
+		<where>
+			<if test="isNew != null and isNew == 1">
+				AND  tl.CREATE_TIME > 	(
+										SELECT lastSeeLogTime 
+										FROM t_userinfo 
+										WHERE userid = #{userid}
+									)
+			</if>
+		</where>
+	</select>
+	
+</mapper>

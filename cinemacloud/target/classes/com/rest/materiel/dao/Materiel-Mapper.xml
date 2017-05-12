@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="materiel">
+
+	<!-- 批量添加影院 -->	
+	<!-- <insert id="insertMaterielList" parameterType="java.util.List" useGeneratedKeys="true" keyColumn="theaterid">
+		insert into t_theater( theaternum,theatername,theaterphone,theateraddress,description,createtime,modifytime) 
+			values 
+	 <foreach item="item" collection="list" separator=",">
+    (#{item.theaternum}, #{item.theatername}, #{item.theaterphone}, #{item.theateraddress}, #{item.description}, #{item.createtime}, #{item.modifytime})
+  </foreach>
+	</insert> -->
+	
+	<!-- 新增批次 -->	
+	<insert id="insertMaterielBatch" parameterType="java.util.Map" useGeneratedKeys="true" keyProperty="suppliesconfid" keyColumn="suppliesconfid">
+		insert into t_supplies_conf( suppliesconfname,distributor,operatorid,createtime) 
+			values 
+		(#{suppliesconfname},#{distributor},#{operatorid},#{createtime})
+	</insert>
+	
+	<!-- 更新批次 -->	
+	<update id="updateMaterielBatch" parameterType="java.util.Map">
+		update t_supplies_conf set modifytime = #{modifytime}
+		<if test="suppliesconfname != null">
+			, suppliesconfname = #{suppliesconfname}
+		</if>
+		<if test="distributor != null">
+			, distributor = #{distributor}
+		</if>
+		<if test="operatorid != null">
+			, operatorid = #{operatorid}
+		</if>
+		<if test="createtime != null">
+			, createtime = #{createtime}
+		</if>
+		where suppliesconfid = #{suppliesconfid}
+	</update>
+	
+	<!-- 删除物料批次 -->
+	<delete id="deleteMaterielBatch" parameterType="java.util.Map">
+		DELETE FROM t_supplies_conf where suppliesconfid = #{suppliesconfid}
+	</delete>
+	
+	
+	<!-- 查询物料批次总数 -->
+	<select id="queryMaterielBatchCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(*) as count FROM t_supplies_conf
+		<where>
+			<if test="suppliesconfid != null">and suppliesconfid = #{suppliesconfid}</if>
+			<if test="suppliesconfname != null"> and suppliesconfname like #{suppliesconfname} </if>
+		</where>
+	</select>
+	
+	<!-- 查询物料批次列表 -->
+	<select id="queryMaterielBatchList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT suppliesconfid, suppliesconfname,distributor,createtime,modifytime FROM t_supplies_conf
+		<where>
+			<if test="suppliesconfid != null">and suppliesconfid = #{suppliesconfid}</if>
+			<if test="suppliesconfname != null"> and suppliesconfname like #{suppliesconfname} </if>
+		</where>
+		order by createtime desc
+ 		<if test="start != null and pagesize != null"> 
+ 			limit #{pagesize} offset #{start} 
+ 		</if>
+	</select>
+	
+	
+	<!-- 新增物料分发通知 -->	
+	<insert id="insertMateriel" parameterType="java.util.Map" useGeneratedKeys="true" keyProperty="suppliesid" keyColumn="suppliesid">
+		INSERT INTO t_supplies( suppliesconfid,theaterid,content,status,logistics,waybill,operatorid,sendtime,createtime) 
+			VALUES 
+		(#{suppliesconfid},#{theaterid},#{content},#{status},#{logistics},#{waybill},#{operatorid},#{sendtime},#{createtime})
+	</insert>
+	
+	<!-- 更新物料分发通知 -->
+	<update id="updateMateriel" parameterType="java.util.Map">
+		UPDATE t_supplies set modifytime = #{modifytime}
+		<if test="suppliesconfid != null ">, suppliesconfid = #{suppliesconfid}</if>
+		<if test="theaterid != null ">, theaterid = #{theaterid}</if>
+		<if test="content != null ">, content = #{content}</if>
+		<if test="status != null ">, status = #{status}</if>
+		<if test="logistics != null ">, logistics = #{logistics}</if>
+		<if test="waybill != null ">, waybill = #{waybill}</if>
+		<if test="operatorid != null ">, operatorid = #{operatorid}</if>
+		<if test="sendtime != null ">, sendtime = #{sendtime}</if>
+		<where>
+			suppliesid = #{suppliesid}
+		</where>
+	</update>
+	
+	<!-- 删除物料分发通知 -->
+	<delete id="deleteMateriel" parameterType="java.util.Map">
+		DELETE FROM t_supplies 
+		<where>
+			<if test="suppliesconfid != null">and suppliesconfid = #{suppliesconfid}</if>
+			<if test="suppliesid != null">and suppliesid = #{suppliesid}</if>
+		</where>
+	</delete>
+	
+	<sql id="queryMaterielListCondition">
+		<where>
+			<if test="suppliesconfid != null"> and ts.suppliesconfid = #{suppliesconfid} </if>
+			<if test="suppliesid != null"> and ts.suppliesid = #{suppliesid} </if>
+			<if test="theatername != null"> and tt.theatername like #{theatername} </if>
+			<if test="theaternum != null"> and tt.theaternum like #{theaternum} </if>
+			<if test="suppliesconfname != null"> and tsc.suppliesconfname like #{suppliesconfname} </if>
+			<if test="waybill != null"> and ts.waybill like #{waybill} </if>
+			<if test="theaterid != null">and ts.theaterid = #{theaterid}</if>
+			<if test="status!=null and status!=''">and ts.status = #{status}</if>
+			<if test="s_time!=null and s_time!='' and e_time!=null and e_time!=''"> and ts.sendtime between #{s_time} and #{e_time} </if>
+		</where>
+	</sql>
+	
+	<!-- 查询物料总数 -->
+	<select id="queryMaterielListCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(*) as count FROM t_supplies ts
+		left join t_theater tt on ts.theaterid=tt.theaterid
+		join t_supplies_conf tsc on ts.suppliesconfid=tsc.suppliesconfid
+		<include refid="queryMaterielListCondition"></include>
+	</select>
+	
+	<!-- 查询物料分发通知列表 -->
+	<select id="queryMaterielList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT ts.suppliesid,ts.suppliesconfid,ts.content,ts.theaterid,tt.theaternum,ts.status,ts.logistics,ts.waybill,ts.sendtime,ts.createtime,tt.theatername FROM t_supplies ts
+		left join t_theater tt on ts.theaterid=tt.theaterid
+		join t_supplies_conf tsc on ts.suppliesconfid=tsc.suppliesconfid
+		<include refid="queryMaterielListCondition"></include>
+		order by ts.createtime desc
+ 		<if test="start != null and pagesize != null"> 
+ 			limit #{pagesize} offset #{start} 
+ 		</if>
+	</select>
+	
+	<!-- 根据suppliesid集合批量查询查询物料列表 -->
+	<select id="queryMaterielListByIds" parameterType="java.util.List" resultType="java.util.Map">
+		SELECT ts.suppliesid,ts.suppliesconfid,ts.content,ts.theaterid,tt.theaternum,ts.status,ts.logistics,ts.waybill,ts.sendtime,ts.createtime,tt.theatername,tsc.suppliesconfname,tu.userid FROM t_supplies ts
+		left join t_theater tt on ts.theaterid=tt.theaterid
+		join t_supplies_conf tsc on ts.suppliesconfid=tsc.suppliesconfid
+		left join t_userinfo  tu on tu.theaterid=ts.theaterid
+		left join t_role tr on tr.roleid=tu.roleid
+		WHERE ts.suppliesid IN
+		<foreach item="item" collection="list" separator="," open="(" close=")">
+    			#{item}
+  		</foreach>
+  		and (tr.rolename like '%运营%' or tr.rolename like '%影院管理员%')
+	</select>
+	
+	<!-- 更新物料分发通知 -->
+	<update id="updateMaterielByIds" parameterType="java.util.List">
+	
+		<foreach collection="list" item="item" separator=";">
+			UPDATE t_supplies set modifytime = #{item.modifytime},status=1
+			<!-- <if test="suppliesconfid != null ">, suppliesconfid = #{suppliesconfid}</if>
+			<if test="theaterid != null ">, theaterid = #{theaterid}</if>
+			<if test="content != null ">, content = #{content}</if>
+			<if test="status != null ">, status = #{status}</if>
+			<if test="logistics != null ">, logistics = #{logistics}</if>
+			<if test="waybill != null ">, waybill = #{waybill}</if>
+			<if test="operatorid != null ">, operatorid = #{operatorid}</if>
+			<if test="sendtime != null ">, sendtime = #{sendtime}</if> -->
+			<where>
+				suppliesid = #{item.suppliesid}
+			</where>
+		</foreach>
+	</update>
+	
+	<!-- 查询物料分发通知未收货列表 -->
+	<select id="queryMaterielStatusList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT ts.suppliesid,ts.suppliesconfid,ts.content,ts.theaterid,tt.theaternum,ts.status,ts.logistics,ts.waybill,ts.sendtime,ts.createtime,tt.theatername FROM t_supplies ts
+		left join t_theater tt on ts.theaterid=tt.theaterid
+		join t_supplies_conf tsc on ts.suppliesconfid=tsc.suppliesconfid
+		<where>
+			ts.status =1 and ts.status != 2
+			<if test="s_time!=null and s_time!='' and e_time!=null and e_time!=''"> and ts.sendtime between #{s_time} and #{e_time} </if>
+		</where>
+	</select>
+	
+	<!-- 批量添加物料分发通知 -->
+	<insert id="insertMaterielList" parameterType="java.util.Map" useGeneratedKeys="true" keyColumn="suppliesid" keyProperty="suppliesid">
+		
+		insert into t_supplies( suppliesconfid,diskcardcount,customer_phone,customer,recipient_address,operatorid,createtime,theaterid,content,status)
+		values 
+		<foreach item="item" collection="list" separator=",">
+	    (#{item.suppliesconfid}, #{item.diskcardcount}, #{item.customer_phone},#{item.customer},#{item.recipient_address}, #{item.operatorid}, #{item.createtime}, #{item.theaterid},#{item.content},#{item.status})
+	    </foreach>
+	</insert>
+	
+	<delete id="batchDeleteMateriel" parameterType="java.util.List" >
+		delete from t_supplies where suppliesid in 
+			<foreach collection="list" item="item" separator="," open="(" close=")" >
+				#{item}
+			</foreach>
+	</delete>
+
+	<select id="getUserid" parameterType="java.util.List" resultType="java.util.Map">
+		SELECT userid,suppliesid,content,suppliesconfname,theatername FROM t_supplies ts
+		JOIN  t_userinfo tu ON ts.theaterid=tu.theaterid
+		JOIN  t_supplies_conf tsc ON  ts.suppliesconfid=tsc.suppliesconfid
+		JOIN t_theater tt ON tt.theaterid=ts.theaterid
+		WHERE roleid IN (70,78) AND suppliesid IN
+		<foreach collection="list" item="item" separator="," open="(" close=")" >
+			#{item}
+		</foreach>
+	</select>
+
+</mapper>
